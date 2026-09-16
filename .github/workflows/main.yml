@@ -3,13 +3,6 @@ name: Build Kernels
 permissions:
   contents: write
   actions: write
-  # update-verified-pins pushes a commit that modifies .github/workflows/main.yml
-  # (the PIN_* block), which requires the `workflows` scope on the GITHUB_TOKEN.
-  # That scope is NOT permitted in job-level permissions blocks (the schema
-  # rejects it), so it must live at the workflow level; jobs without their own
-  # `permissions:` key inherit it. Jobs that DO declare a job-level block keep
-  # least-privilege and never see the extra scopes.
-  workflows: write
 
 on:
   workflow_dispatch:
