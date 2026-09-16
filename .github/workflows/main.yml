@@ -934,17 +934,19 @@ jobs:
       group: update-verified-pins-${{ github.repository }}
       queue: max
       cancel-in-progress: false
-    # Promote-pins job. Its `needs` lists ALL 7 build-android jobs, but most
-    # are `skipped` when the run only selects a subset of sublevels. A bare
-    # `if: commit_mode=='update'` (no needs reference) makes GitHub auto-skip
-    # this whole job whenever ANY needs entry is skipped, so single-sublevel
-    # updates could never promote pins. Reference each needs result explicitly:
-    # GitHub then evaluates the expression (skipped deps yield 'skipped', not
-    # an auto-skip). A sublevel that was NOT selected is 'skipped' (allowed);
-    # one that was selected and FAILED is 'failure' (blocks promotion) — the
-    # intended "write pins only when everything built green" semantic.
+    # Promote-pins job. Its `needs` lists ALL 7 build-android jobs, but the
+    # unselected ones are `skipped`. Verified empirically (run 35106814577):
+    # merely referencing needs.*.result in `if` does NOT bypass GitHub's
+    # auto-skip for skipped dependencies — the job still got skipped. Only the
+    # "always" family of functions (always()/!cancelled()) forces evaluation.
+    # `always() && !cancelled()`: evaluate on any non-cancelled run, then
+    # decide ourselves — a selected sublevel that FAILED is 'failure' (blocks
+    # promotion, preserving "write pins only when everything built green");
+    # an unselected sublevel is 'skipped' (allowed).
     if: |
-      ${{ github.event_name == 'workflow_dispatch'
+      ${{ always()
+        && !cancelled()
+        && github.event_name == 'workflow_dispatch'
         && !inputs.test_release_notes
         && inputs.commit_mode == 'update'
         && needs.resolve-sources.result == 'success'
