@@ -1,3 +1,0 @@
-name: probe
-on: {push: {branches: [never]}}
-jobs: {x: {runs-on: ubuntu-latest, steps: [{run: echo ok}]}}
