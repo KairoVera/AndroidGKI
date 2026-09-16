@@ -3,6 +3,13 @@ name: Build Kernels
 permissions:
   contents: write
   actions: write
+  # update-verified-pins pushes a commit that modifies .github/workflows/main.yml
+  # (the PIN_* block), which requires the `workflows` scope on the GITHUB_TOKEN.
+  # That scope is NOT permitted in job-level permissions blocks (the schema
+  # rejects it), so it must live at the workflow level; jobs without their own
+  # `permissions:` key inherit it. Jobs that DO declare a job-level block keep
+  # least-privilege and never see the extra scopes.
+  workflows: write
 
 on:
   workflow_dispatch:
@@ -959,14 +966,11 @@ jobs:
         && (needs.build-android16-6-12.result == 'success' || needs.build-android16-6-12.result == 'skipped')
       }}
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: write
-      # The promoted commit touches .github/workflows/main.yml (the PIN_*
-      # block); pushing a commit that modifies workflow files requires the
-      # `workflows` scope on the job token, otherwise GitHub rejects the
-      # push (run 35108402243: "without workflows permission").
-      workflows: write
+    # No job-level permissions block: this job pushes a commit that modifies
+    # .github/workflows/main.yml (the PIN_* block), which needs the
+    # `workflows` scope — only grantable at the workflow level. Any job-level
+    # permissions block would override the workflow level and drop it (run
+    # 35108402243: "without `workflows` permission"). Inherit instead.
     needs:
     - resolve-sources
     - build-android12-5-10
@@ -1517,13 +1521,10 @@ jobs:
     if: always() && github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && inputs.release_type == 'Action'
     needs: [notes-preview]
     runs-on: ubuntu-latest
-    # gh release create/delete needs the `releases` scope; deleting the
-    # nightly tag needs contents:write. Run 35108402243 hit
-    # "HTTP 403: Resource not accessible by integration" without these.
-    permissions:
-      actions: read
-      contents: write
-      releases: write
+    # No job-level permissions block: gh release create/delete and tag
+    # deletion are covered by the workflow-level `contents: write`. Note
+    # `releases` is NOT a GITHUB_TOKEN permission — granting it at the job
+    # level made GitHub reject the whole workflow file (dispatch 422).
     concurrency:
       group: nightly-release-${{ github.ref }}
       cancel-in-progress: false
