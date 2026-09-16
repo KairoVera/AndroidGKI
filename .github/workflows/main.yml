@@ -934,7 +934,28 @@ jobs:
       group: update-verified-pins-${{ github.repository }}
       queue: max
       cancel-in-progress: false
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && inputs.commit_mode == 'update'"
+    # Promote-pins job. Its `needs` lists ALL 7 build-android jobs, but most
+    # are `skipped` when the run only selects a subset of sublevels. A bare
+    # `if: commit_mode=='update'` (no needs reference) makes GitHub auto-skip
+    # this whole job whenever ANY needs entry is skipped, so single-sublevel
+    # updates could never promote pins. Reference each needs result explicitly:
+    # GitHub then evaluates the expression (skipped deps yield 'skipped', not
+    # an auto-skip). A sublevel that was NOT selected is 'skipped' (allowed);
+    # one that was selected and FAILED is 'failure' (blocks promotion) — the
+    # intended "write pins only when everything built green" semantic.
+    if: |
+      ${{ github.event_name == 'workflow_dispatch'
+        && !inputs.test_release_notes
+        && inputs.commit_mode == 'update'
+        && needs.resolve-sources.result == 'success'
+        && (needs.build-android12-5-10.result == 'success' || needs.build-android12-5-10.result == 'skipped')
+        && (needs.build-android13-5-10.result == 'success' || needs.build-android13-5-10.result == 'skipped')
+        && (needs.build-android13-5-15.result == 'success' || needs.build-android13-5-15.result == 'skipped')
+        && (needs.build-android14-5-15.result == 'success' || needs.build-android14-5-15.result == 'skipped')
+        && (needs.build-android14-6-1.result == 'success' || needs.build-android14-6-1.result == 'skipped')
+        && (needs.build-android15-6-6.result == 'success' || needs.build-android15-6-6.result == 'skipped')
+        && (needs.build-android16-6-12.result == 'success' || needs.build-android16-6-12.result == 'skipped')
+      }}
     runs-on: ubuntu-latest
     permissions:
       actions: read
