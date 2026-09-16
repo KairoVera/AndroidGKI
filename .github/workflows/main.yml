@@ -999,10 +999,21 @@ jobs:
     - name: Commit promoted pins
       if: always() && steps.promote.conclusion == 'success'
       shell: bash
+      env:
+        # The promoted commit modifies .github/workflows/main.yml (the PIN_*
+        # block), which GITHUB_TOKEN cannot push (it lacks the `workflows`
+        # scope, and `workflows` is not grantable via a permissions: key at any
+        # level — the schema rejects it). Use the repo-scoped fine-grained PAT
+        # stored as the CI_PROMOTE_TOKEN secret instead; referencing it via
+        # secrets.* keeps the value redacted in logs.
+        CI_PROMOTE_TOKEN: ${{ secrets.CI_PROMOTE_TOKEN }}
       run: |
         set -euo pipefail
         git config user.name "github-actions[bot]"
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        # Point the remote at the promote PAT so pull/push authenticate with a
+        # token that has the workflows scope GITHUB_TOKEN lacks.
+        git remote set-url origin "https://x-access-token:${CI_PROMOTE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         STAMP="$(date -u +%Y-%m-%dT%H%M%SZ)"
         git add .github/workflows/main.yml .github/pins/history
         if git diff --cached --quiet; then
@@ -1542,9 +1553,13 @@ jobs:
 
       - name: Replace nightly prerelease
         env:
-          GH_TOKEN: ${{ github.token }}
+          # gh release create/delete 403'd under GITHUB_TOKEN (needs a scope it
+          # lacks here); the repo-scoped fine-grained PAT in CI_PROMOTE_TOKEN
+          # carries it. git push --delete / ls-remote also ride the same PAT.
+          GH_TOKEN: ${{ secrets.CI_PROMOTE_TOKEN }}
         run: |
           set -e
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           gh release delete nightly --cleanup-tag -y || true
           if git ls-remote --tags origin nightly | grep -q 'refs/tags/nightly'; then
             git push --delete origin nightly || true
