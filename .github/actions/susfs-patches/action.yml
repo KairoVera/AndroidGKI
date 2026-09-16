@@ -147,6 +147,22 @@ runs:
       run: |
         patch -p1 < 50_add_susfs_in_gki-${{ inputs.version }}.patch
 
+        # Upstream SUSFS bug: in the applied statfs.c, the call to
+        # susfs_sus_kstat_spoof_vfs_statfs() sits inside susfs_statfs_by_dentry()
+        # which is defined BEFORE the extern block that declares it, and
+        # susfs_def.h carries no forward declaration. GKI clang -Werror
+        # fails with "implicit declaration of function" when
+        # CONFIG_KSU_SUSFS_SUS_KSTAT=y. Insert a forward declaration before the
+        # function definition. No-op once upstream reorders the hunks.
+        if grep -q 'susfs_sus_kstat_spoof_vfs_statfs(d_backing_inode' fs/statfs.c 2>/dev/null; then
+          first_call=$(grep -n 'susfs_sus_kstat_spoof_vfs_statfs(d_backing_inode' fs/statfs.c | head -1 | cut -d: -f1)
+          first_decl=$(grep -n '^extern int susfs_sus_kstat_spoof_vfs_statfs' fs/statfs.c | head -1 | cut -d: -f1)
+          if [ -z "$first_decl" ] || [ "$first_call" -lt "$first_decl" ]; then
+            sed -i '/^static int susfs_statfs_by_dentry(/i extern int susfs_sus_kstat_spoof_vfs_statfs(struct inode *inode, struct kstatfs *buf, bool *is_fuse);' fs/statfs.c
+            echo "Fixed SUSFS statfs.c forward declaration order (call before extern)"
+          fi
+        fi
+
         # SUSFS's OPEN_REDIRECT code unconditionally calls VMA_PAD_START(), which
         # only exists on GKI branches that carry Google's page-size-migration
         # feature (added to each android version's kernel/common branch at a
