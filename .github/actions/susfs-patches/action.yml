@@ -154,7 +154,8 @@ runs:
         # fails with "implicit declaration of function" when
         # CONFIG_KSU_SUSFS_SUS_KSTAT=y. Insert a forward declaration before the
         # function definition. No-op once upstream reorders the hunks.
-        if grep -q 'susfs_sus_kstat_spoof_vfs_statfs(d_backing_inode' fs/statfs.c 2>/dev/null; then
+        if grep -q 'susfs_sus_kstat_spoof_vfs_statfs(d_backing_inode' fs/statfs.c 2>/dev/null \
+           && ! grep -q 'susfs_sus_kstat_spoof_vfs_statfs' include/linux/susfs_def.h 2>/dev/null; then
           first_call=$(grep -n 'susfs_sus_kstat_spoof_vfs_statfs(d_backing_inode' fs/statfs.c | head -1 | cut -d: -f1)
           first_decl=$(grep -n '^extern int susfs_sus_kstat_spoof_vfs_statfs' fs/statfs.c | head -1 | cut -d: -f1)
           if [ -z "$first_decl" ] || [ "$first_call" -lt "$first_decl" ]; then
