@@ -962,6 +962,11 @@ jobs:
     permissions:
       actions: read
       contents: write
+      # The promoted commit touches .github/workflows/main.yml (the PIN_*
+      # block); pushing a commit that modifies workflow files requires the
+      # `workflows` scope on the job token, otherwise GitHub rejects the
+      # push (run 35108402243: "without workflows permission").
+      workflows: write
     needs:
     - resolve-sources
     - build-android12-5-10
@@ -1008,6 +1013,16 @@ jobs:
           exit 0
         fi
         git commit -m "chore(pins): promote verified commits to latest built (${STAMP})"
+        # The branch may have moved ahead while this run was building (a
+        # manual or other-bot push). Rebase our pin-promotion commit onto the
+        # current tip so the push stays fast-forward instead of being rejected
+        # as non-fast-forward. Conflict => abort and let the next update run
+        # re-promote; never force-push.
+        if ! git pull --rebase origin "${GITHUB_REF_NAME}"; then
+          echo "Rebase conflict promoting pins; aborting (next update run will retry)." >&2
+          git rebase --abort || true
+          exit 1
+        fi
         git push
   rej:
     if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && always()"
@@ -1502,6 +1517,13 @@ jobs:
     if: always() && github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && inputs.release_type == 'Action'
     needs: [notes-preview]
     runs-on: ubuntu-latest
+    # gh release create/delete needs the `releases` scope; deleting the
+    # nightly tag needs contents:write. Run 35108402243 hit
+    # "HTTP 403: Resource not accessible by integration" without these.
+    permissions:
+      actions: read
+      contents: write
+      releases: write
     concurrency:
       group: nightly-release-${{ github.ref }}
       cancel-in-progress: false
