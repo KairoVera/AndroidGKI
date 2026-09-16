@@ -23,6 +23,21 @@ runs:
         cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
         cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.version }}.patch ./
 
+        # Upstream SUSFS bug: fs/susfs.c (SUS_KSTAT spoofing) calls
+        # security_sb_statfs() but never includes <linux/security.h>, where
+        # that symbol is declared. GKI clang -Werror fails on the implicit
+        # declaration. Add the include if missing (idempotent; no-op once the
+        # upstream susfs.c carries it or stops calling security_sb_statfs).
+        if ! grep -q '#include <linux/security.h>' fs/susfs.c 2>/dev/null \
+           && grep -q 'security_sb_statfs' fs/susfs.c 2>/dev/null; then
+          if grep -q '#include <linux/statfs.h>' fs/susfs.c; then
+            sed -i '/#include <linux\/statfs.h>/a #include <linux/security.h>' fs/susfs.c
+          else
+            sed -i '/#include <linux\/version.h>/a #include <linux/security.h>' fs/susfs.c
+          fi
+          echo "Added <linux/security.h> to fs/susfs.c for security_sb_statfs()"
+        fi
+
     - name: Apply Android 12 5.10 Fake Patches
       shell: bash
       if: inputs.version == 'android12-5.10'
