@@ -527,8 +527,22 @@ jobs:
       if: always() && inputs.use_cache && (inputs.version == 'android12-5.10' || inputs.version == 'android13-5.10' || inputs.version == 'android13-5.15')
       shell: bash
       run: |
+        # Prune STALE ccache objects only — never clear the cache.
+        #
+        # This step previously ran `ccache -c` here to "prune", but `-c` is
+        # ccache's "--clear" flag: it wipes the ENTIRE cache. The build had
+        # just populated it, so this deleted every object this run produced;
+        # the Save step then archived an empty shell to the release bucket.
+        # The next Restore pulled that shell back (cache-hit=true, yet
+        # hit_rate=0.0%) and re-ran the full ~20min build — a
+        # self-perpetuating cold start. (Confirmed: every ccache-cache-*
+        # release in this repo sits at 0 MB, while the bazel ones carry
+        # 13-64 MB, because bazel builds never hit this step.)
+        #
+        # `find -mtime +0.5` keeps objects newer than ~12h and drops the
+        # rest, so the archive stays bounded across runs without clearing
+        # the freshly-built one.
         if [ -d /home/runner/.ccache ]; then
-          ccache -c 2>/dev/null || true
           find /home/runner/.ccache -type f -mtime +0.5 -delete 2>/dev/null || true
           find /home/runner/.ccache -type d -empty -delete 2>/dev/null || true
           echo "ccache pruned"; ccache -s 2>/dev/null | head -20 || true
