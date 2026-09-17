@@ -15,23 +15,41 @@ runs:
   - name: 'Provide host ld from repo prebuilts'
     shell: bash
     run: |
-      # build.sh scrubs HOSTLDFLAGS from the env, so export it is useless.
-      # Preferred: the repo-synced ld.lld on PATH as "ld": the prebuilt
-      # clang defaults to the "ld" name and some runner images lack
-      # binutils. `|| true` is required: under the default shell
-      # (bash -e -o pipefail), a find over a missing directory (GKI
-      # manifests that don't sync prebuilts/clang) would kill the step,
-      # so fall back to the system ld, which these kernels have always
-      # linked with on this pipeline.
-      LDLLD=$(find "${{ github.workspace }}/kernel/prebuilts/clang" -name "ld.lld" -type f 2>/dev/null | sort | head -n 1 || true)
-      if [ -n "$LDLLD" ]; then
+      # build.sh scrubs HOSTLDFLAGS out of the environment, so the only way
+      # to steer the host linker is to put an "ld" on PATH: prebuilt clang
+      # invokes the bare name "ld" when building host tools (fixdep, modpost,
+      # ...). Source priority:
+      #   1. repo-synced clang ld.lld — GKI manifests sync the toolchain to
+      #      kernel/prebuilts-master/clang/host/linux-x86/clang-<ver>/bin;
+      #      manifests older than ~2023 used kernel/prebuilts/clang, so
+      #      probe both roots.
+      #   2. system binutils ld — every 5.10 LTS build on this pipeline has
+      #      linked with it.
+      #   3. apt-installed binutils — last resort for runner images that
+      #      scrub *llvm*/binutils during disk cleanup.
+      # All finds are `|| true`-guarded: the runner shell is `bash -e -o
+      # pipefail`, so a find over a missing starting directory (exit 1) or
+      # a SIGPIPE from `head` would kill this step before the fallbacks
+      # ever ran.
+      WS="${{ github.workspace }}"
+      LDLLD=""
+      for ROOT in "$WS/kernel/prebuilts-master" "$WS/kernel/prebuilts"; do
+        [ -d "$ROOT" ] || continue
+        LDLLD=$(find "$ROOT" -name "ld.lld" -type f 2>/dev/null | sort -V | tail -n 1 || true)
+        if [ -n "$LDLLD" ]; then
+          break
+        fi
+      done
+      if [ -n "$LDLLD" ] && [ -x "$LDLLD" ]; then
         sudo ln -sf "$LDLLD" /usr/local/bin/ld
-        which ld && ld --version | head -n 1
-      elif command -v ld >/dev/null 2>&1; then
-        echo "INFO: prebuilt ld.lld not found under kernel/prebuilts/clang; falling back to system ld ($(which ld))" >&2
+        echo "host ld: repo-synced $LDLLD ($( "$LDLLD" --version 2>/dev/null | head -n 1 ))"
+      elif command -v ld >/dev/null 2>&1 && ld --version >/dev/null 2>&1; then
+        echo "host ld: system $(command -v ld) ($(ld --version | head -n 1))"
       else
-        echo "ERROR: neither prebuilt ld.lld nor system ld available" >&2
-        exit 1
+        echo "host ld: none available; installing binutils via apt"
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq binutils
+        echo "host ld: $(which ld) ($(ld --version | head -n 1))"
       fi
 
   - name: 'Build Kernel'
