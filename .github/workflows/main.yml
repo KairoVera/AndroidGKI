@@ -194,7 +194,12 @@ jobs:
           # Audited pins (from root-variants.yml). Used only when commit_mode=verified.
           PIN_NOMOUNT="7919faf2ab574110e388a4f444e5fef909c24e16"
           PIN_KERNELSU="bb4f4e86f8d2165db957601507c0e9a35b605e01"
-          PIN_RESUKISU="6ec8d9a8a8be30878c388504cacf8ae7849c757b"
+          # Temporarily rolled back one grid (from 6ec8d9a8) to force the
+          # next update run to exercise the pin write-back path, which is
+          # what re-lands it at the latest tip using the freshly rotated
+          # CI_PROMOTE_TOKEN. Self-correcting: the write-back restores the
+          # promoted SHA automatically.
+          PIN_RESUKISU="b22a46e6ee79931b1e3b39fc562d56176936ab77"
           PIN_SUKISU_ULTRA="b20dee702035af09cb2ecb5f35443bbc1747f3e6"
           declare -A PIN_SUSFS=(
             [susfs_commit_android12_5_10]="85a60092ea3a0768079e2a23672c993995b642fd"
