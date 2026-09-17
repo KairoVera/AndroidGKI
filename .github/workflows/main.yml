@@ -1011,9 +1011,15 @@ jobs:
         set -euo pipefail
         git config user.name "github-actions[bot]"
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        # Point the remote at the promote PAT so pull/push authenticate with a
-        # token that has the workflows scope GITHUB_TOKEN lacks.
-        git remote set-url origin "https://x-access-token:${CI_PROMOTE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        # Diagnose whether the promote secret reached this job — print only its
+        # length, never the token value.
+        echo "CI_PROMOTE_TOKEN length: ${#CI_PROMOTE_TOKEN}"
+        # Authenticate pull/push with the promote PAT via an inline URL: the
+        # userinfo in the URL has highest precedence, so pull/push use the PAT
+        # directly instead of the credential helper that actions/checkout wires
+        # to GITHUB_TOKEN (which lacks the `workflows` scope). If the secret is
+        # empty the URL degrades to anonymous and the failure is visible in logs.
+        PROMOTE_URL="https://x-access-token:${CI_PROMOTE_TOKEN}@github.com/KairoVera/AndroidGKI.git"
         STAMP="$(date -u +%Y-%m-%dT%H%M%SZ)"
         git add .github/workflows/main.yml .github/pins/history
         if git diff --cached --quiet; then
@@ -1021,17 +1027,15 @@ jobs:
           exit 0
         fi
         git commit -m "chore(pins): promote verified commits to latest built (${STAMP})"
-        # The branch may have moved ahead while this run was building (a
-        # manual or other-bot push). Rebase our pin-promotion commit onto the
-        # current tip so the push stays fast-forward instead of being rejected
-        # as non-fast-forward. Conflict => abort and let the next update run
-        # re-promote; never force-push.
-        if ! git pull --rebase origin "${GITHUB_REF_NAME}"; then
+        # The branch may have moved ahead while this run was building (a manual
+        # or other-bot push). Rebase onto the current tip so the push stays
+        # fast-forward; on conflict abort and let the next update run retry.
+        if ! git pull --rebase "$PROMOTE_URL" "${GITHUB_REF_NAME}"; then
           echo "Rebase conflict promoting pins; aborting (next update run will retry)." >&2
           git rebase --abort || true
           exit 1
         fi
-        git push
+        git push "$PROMOTE_URL" "${GITHUB_REF_NAME}"
   rej:
     if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && always()"
     runs-on: ubuntu-latest
