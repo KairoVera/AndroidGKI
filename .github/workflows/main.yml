@@ -1009,39 +1009,37 @@ jobs:
         CI_PROMOTE_TOKEN: ${{ secrets.CI_PROMOTE_TOKEN }}
       run: |
         set -euo pipefail
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        # Diagnose whether the promote secret reached this job — print only its
-        # length, never the token value.
+        # The promote step already rewrote main.yml and dropped a
+        # .github/pins/history record into the working tree. Detect exactly
+        # which files changed with a local `git status` (no network, no auth —
+        # safe), then land the commit over the Contents API, NOT `git push`.
+        #
+        # Why not git push: actions/checkout injects GITHUB_TOKEN via a
+        # per-credential config file pulled in by `includeIf.gitdir`, which
+        # sets http.https://github.com/.extraheader = AUTHORIZATION: basic
+        # <GITHUB_TOKEN>. That injected header overrides credentials embedded
+        # in the URL, so pull/push still went out under the GitHub App token,
+        # which the server refuses for any commit touching .github/workflows/
+        # ("without `workflows` permission" — a scope no `permissions:` key
+        # can grant GITHUB_TOKEN). The Contents API is plain HTTPS with the
+        # repo-scoped PAT in the Authorization header — the same channel
+        # nightly-release already uses successfully. See
+        # .github/scripts/commit_promoted_pins.py for the full rationale.
         echo "CI_PROMOTE_TOKEN length: ${#CI_PROMOTE_TOKEN}"
-        # Why a bare PAT-in-URL push was still rejected: actions/checkout
-        # wires per-host git auth via the config key
-        #   http.https://github.com/.extraheader = Authorization: Bearer <GITHUB_TOKEN>
-        # and an Authorization header beats credentials embedded in the URL,
-        # so pull/push kept riding the GitHub App token — which can never
-        # push a commit touching .github/workflows/ (server reply: "refusing
-        # to allow a GitHub App ... without `workflows` permission"). Drop the
-        # header first, then let the inline PAT in the URL be the only credential;
-        # if the secret is empty the URL degrades to anonymous and the failure
-        # is visible in logs.
-        git config --local --unset-all "http.https://github.com/.extraheader" 2>/dev/null || true
-        PROMOTE_URL="https://x-access-token:${CI_PROMOTE_TOKEN}@github.com/KairoVera/AndroidGKI.git"
-        STAMP="$(date -u +%Y-%m-%dT%H%M%SZ)"
-        git add .github/workflows/main.yml .github/pins/history
-        if git diff --cached --quiet; then
+        # --untracked-files=all: list each new history file individually, not
+        # a collapsed "?? .github/pins/history/" directory (the Contents API
+        # commits one path per request).
+        CHANGED="$(git status --porcelain --untracked-files=all .github/workflows/main.yml .github/pins/history 2>/dev/null | awk '{print $2}')"
+        if [ -z "${CHANGED//[[:space:]]/}" ]; then
           echo "No pin changes to commit."
           exit 0
         fi
-        git commit -m "chore(pins): promote verified commits to latest built (${STAMP})"
-        # The branch may have moved ahead while this run was building (a manual
-        # or other-bot push). Rebase onto the current tip so the push stays
-        # fast-forward; on conflict abort and let the next update run retry.
-        if ! git pull --rebase "$PROMOTE_URL" "${GITHUB_REF_NAME}"; then
-          echo "Rebase conflict promoting pins; aborting (next update run will retry)." >&2
-          git rebase --abort || true
-          exit 1
-        fi
-        git push "$PROMOTE_URL" "${GITHUB_REF_NAME}"
+        echo "Promoted files:"
+        printf '  %s\n' $CHANGED
+        STAMP="$(date -u +%Y-%m-%dT%H%M%SZ)"
+        # shellcheck disable=SC2086  # unquoted $CHANGED word-splits into argv
+        python3 .github/scripts/commit_promoted_pins.py \
+          "chore(pins): promote verified commits to latest built (${STAMP})" $CHANGED
   rej:
     if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && always()"
     runs-on: ubuntu-latest
