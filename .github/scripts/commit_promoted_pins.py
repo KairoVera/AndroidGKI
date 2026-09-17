@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Land the in-tree pin promotion on the dev branch via the GitHub Contents
+"""Land the in-tree pin promotion on the dev branch via the GitHub Git Data
 API, authenticated with the repo-scoped fine-grained PAT (GH_TOKEN).
 
 Why the write-back bypasses `git push` entirely
@@ -15,11 +15,16 @@ GitHub App to create or update workflow ... without `workflows` permission"),
 and that `workflows` scope is not grantable to GITHUB_TOKEN via any
 `permissions:` key (the schema rejects it).
 
-The Contents API is plain HTTPS with the PAT in the Authorization header —
-the same proven channel the nightly-release job already uses — and the PAT
-carries the `workflows` + `contents` write scopes, so the commit lands. The
-new commit sits on the branch tip as read at commit time; a concurrent edit
-surfaces as a 409 and the next update run simply re-promotes.
+The Git Data API is plain HTTPS with the PAT in the Authorization header —
+the same proven channel nightly-release already uses — and the PAT carries
+the `workflows` + `contents` write scopes, so the commit lands. The commit
+sits on the branch tip as read at commit time; a concurrent edit surfaces as
+a 409 and the next update run simply re-promotes.
+
+Endpoint note: the multi-file form is POST /repos/{owner}/{repo}/commits
+with a `files` array (base64 `content`, `path`). There is NO REST endpoint
+`PUT /repos/{owner}/{repo}/contents` without a path — that URL does not
+exist and returns 404; the single-file PUT/POST is per-`path` only.
 
 Usage: commit_promoted_pins.py <message> <file...>
 """
@@ -28,12 +33,14 @@ import json
 import os
 import sys
 import urllib.error
-import urllib.parse
 import urllib.request
 
 REPO = os.environ["GITHUB_REPOSITORY"]
 BRANCH = os.environ["GITHUB_REF_NAME"]
-TOK = os.environ.get("GH_TOKEN") or os.environ.get("CI_PROMOTE_TOKEN") or ""
+# CI_PROMOTE_TOKEN is what the "Commit promoted pins" step declares, so it
+# wins; GH_TOKEN is only a fallback for local ad-hoc runs. In the workflow
+# step GH_TOKEN is not set, so a GITHUB_TOKEN app token can never leak in.
+TOK = os.environ.get("CI_PROMOTE_TOKEN") or os.environ.get("GH_TOKEN") or ""
 API = f"https://api.github.com/repos/{REPO}"
 
 
@@ -54,21 +61,14 @@ def call(method, url, body=None):
             return json.load(resp)
     except urllib.error.HTTPError as e:
         detail = e.read().decode(errors="replace")[:500]
-        raise SystemExit(f"Contents API {method} {url} -> {e.code}: {detail}")
-    except urllib.error.URLError as e:
-        raise SystemExit(f"Contents API {method} {url} -> network: {e.reason}")
-
-
-def blob_sha(path):
-    """sha of `path` on BRANCH, or None when the file is new (no update sha
-    needed for a create). A 404 is the expected 'new file' case."""
-    q = urllib.parse.quote(path)
-    try:
-        return call("GET", f"{API}/contents/{q}?ref={BRANCH}")["sha"]
-    except SystemExit as e:
-        if " -> 404" in str(e):
+        # A 409 here means the branch moved between our checkout and the
+        # commit — let the next update run retry rather than force anything.
+        if e.code == 409:
+            print(f"409: branch {BRANCH} moved; next update run will re-promote.")
             return None
-        raise
+        raise SystemExit(f"Git Data API {method} {url} -> {e.code}: {detail}")
+    except urllib.error.URLError as e:
+        raise SystemExit(f"Git Data API {method} {url} -> network: {e.reason}")
 
 
 def main():
@@ -79,25 +79,21 @@ def main():
     if not TOK:
         sys.exit("ERROR: no PAT available for the pin write-back (GH_TOKEN empty)")
 
-    entries = []
+    files_body = []
     for path in files:
-        entry = {
-            "path": path,
-            "content": base64.b64encode(open(path, "rb").read()).decode(),
-        }
-        sha = blob_sha(path)
-        if sha:  # updating an existing file requires its current sha
-            entry["sha"] = sha
-        entries.append(entry)
-        print(f"  {'update' if sha else 'create'} {path}")
+        with open(path, "rb") as fh:
+            content = base64.b64encode(fh.read()).decode()
+        files_body.append({"content": content, "path": path})
+        print(f"  commit {path}")
 
-    # One commit carrying every promoted file (Contents API nested form).
-    res = call("PUT", f"{API}/contents", {
+    res = call("POST", f"{API}/commits", {
         "message": msg,
         "branch": BRANCH,
-        "contents": entries,
+        "files": files_body,
     })
-    print(f"Commit {res['commit']['sha']} on {BRANCH}: {len(entries)} file(s).")
+    if res is None:
+        return  # 409 retry case, handled above
+    print(f"Commit {res['sha']} on {BRANCH}: {len(files_body)} file(s).")
 
 
 if __name__ == "__main__":
