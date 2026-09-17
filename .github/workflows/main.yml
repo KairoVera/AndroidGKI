@@ -1021,10 +1021,23 @@ jobs:
         # in the URL, so pull/push still went out under the GitHub App token,
         # which the server refuses for any commit touching .github/workflows/
         # ("without `workflows` permission" — a scope no `permissions:` key
-        # can grant GITHUB_TOKEN). The Contents API is plain HTTPS with the
-        # repo-scoped PAT in the Authorization header — the same channel
-        # nightly-release already uses successfully. See
-        # .github/scripts/commit_promoted_pins.py for the full rationale.
+        # can grant GITHUB_TOKEN).
+        #
+        # Why not POST /repos/{owner}/{repo}/commits (the "create commit with
+        # files[]" endpoint): it is NOT on GitHub's list of endpoints
+        # available to fine-grained personal access tokens — a fine-grained
+        # token gets a 404 (GitHub hides token-permission gaps behind 404,
+        # not 403, to prevent probing). The fine-grained-friendly write path
+        # is PUT /repos/{owner}/{repo}/contents/{path} ("create or update
+        # file contents"): it needs Contents:write, plus Workflows:write
+        # when the path is under .github/workflows/ — exactly the two
+        # scopes CI_PROMOTE_TOKEN grants. Plain HTTPS, PAT in the
+        # Authorization header — the same channel nightly-release already
+        # uses successfully.
+        #
+        # See .github/scripts/commit_promoted_pins.py (which carries the
+        # sha-of-existing-file rule: updating a file must send its current
+        # blob sha from the repo, new files omit it).
         echo "CI_PROMOTE_TOKEN length: ${#CI_PROMOTE_TOKEN}"
         # --untracked-files=all: list each new history file individually, not
         # a collapsed "?? .github/pins/history/" directory (the Contents API
