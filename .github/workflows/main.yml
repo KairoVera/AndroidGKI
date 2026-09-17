@@ -1742,3 +1742,5 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+
+# ci: workflows-permission probe (scratch branch, auto-cleaned)
