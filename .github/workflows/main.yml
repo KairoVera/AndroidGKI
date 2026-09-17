@@ -1014,11 +1014,17 @@ jobs:
         # Diagnose whether the promote secret reached this job — print only its
         # length, never the token value.
         echo "CI_PROMOTE_TOKEN length: ${#CI_PROMOTE_TOKEN}"
-        # Authenticate pull/push with the promote PAT via an inline URL: the
-        # userinfo in the URL has highest precedence, so pull/push use the PAT
-        # directly instead of the credential helper that actions/checkout wires
-        # to GITHUB_TOKEN (which lacks the `workflows` scope). If the secret is
-        # empty the URL degrades to anonymous and the failure is visible in logs.
+        # Why a bare PAT-in-URL push was still rejected: actions/checkout
+        # wires per-host git auth via the config key
+        #   http.https://github.com/.extraheader = Authorization: Bearer <GITHUB_TOKEN>
+        # and an Authorization header beats credentials embedded in the URL,
+        # so pull/push kept riding the GitHub App token — which can never
+        # push a commit touching .github/workflows/ (server reply: "refusing
+        # to allow a GitHub App ... without `workflows` permission"). Drop the
+        # header first, then let the inline PAT in the URL be the only credential;
+        # if the secret is empty the URL degrades to anonymous and the failure
+        # is visible in logs.
+        git config --local --unset-all "http.https://github.com/.extraheader" 2>/dev/null || true
         PROMOTE_URL="https://x-access-token:${CI_PROMOTE_TOKEN}@github.com/KairoVera/AndroidGKI.git"
         STAMP="$(date -u +%Y-%m-%dT%H%M%SZ)"
         git add .github/workflows/main.yml .github/pins/history
