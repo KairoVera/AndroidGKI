@@ -15,10 +15,18 @@ runs:
   - name: 'Provide host ld from repo prebuilts'
     shell: bash
     run: |
-      # build.sh scrubs HOSTLDFLAGS out of the environment, so the only way
-      # to steer the host linker is to put an "ld" on PATH: prebuilt clang
-      # invokes the bare name "ld" when building host tools (fixdep, modpost,
-      # ...). Source priority:
+      # build.sh scrubs the HOSTLDFLAGS environment variable, and GKI's
+      # _setup_env.sh rebuilds PATH, so a prebuilt clang cannot find "ld"
+      # when it links host tools (fixdep, modpost, ...). The fix has two
+      # layers; this step provides the belt, the Build step the ceiling:
+      #   CEILING (Build step): HOSTLDFLAGS=-fuse-ld=lld forwarded as a make
+      #     command-line variable, gated on host_ld_fuse — which this step
+      #     sets below ONLY when the resolved clang bin dir ships its own
+      #     ld.lld. The clang driver then links host tools with the ld.lld
+      #     next to the binary: no PATH entry, no /usr/local/bin symlink.
+      #   BELT (this step): still put a working "ld" on PATH, so if the
+      #     ceiling gate is ever unset (config chain empty, dir unsynced, or
+      #     no co-located ld.lld) the build still links. Source priority:
       #   1. BUILD-CONFIG CLANG (precise): source the build config the kernel
       #      actually uses (common/build.config.gki.aarch64 -> build.config.
       #      common) and read CLANG_PREBUILT_BIN — the clang bin dir the build
