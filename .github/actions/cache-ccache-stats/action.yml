@@ -53,9 +53,15 @@ runs:
           echo "====================="
           ccache -z || true
           echo "====================="
-
-          if [ -d /home/runner/.ccache ] && find /home/runner/.ccache -type f -print -quit 2>/dev/null | grep -q .; then
-            find /home/runner/.ccache -type f -exec touch -t $(date -d "1 day ago" +%Y%m%d%H%M) {} +
-            echo "[+] ccache atime updated"
-          fi
+          # NOTE: this step used to `touch -t "1 day ago"` every cached
+          # object so the pre-save prune (`find -mtime +0.5 -delete`)
+          # could tell "restored stale" from "built this run". That
+          # mtime bookkeeping fought the tar restore (fresh mtimes) and
+          # ccache's own accounting, and — combined with
+          # CCACHE_DIRECT=true (object names embed per-VM inodes, so
+          # "this run" objects never matched "restored" objects) the
+          # archive snowballed 0.6 -> 1.2 GB every run. With
+          # CCACHE_DIRECT=false the keys are preprocessor-stable, the
+          # same object name is reused across runs, and the cache no
+          # longer grows: nothing to mark stale, no touch needed.
         fi

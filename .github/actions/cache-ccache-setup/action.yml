@@ -50,8 +50,15 @@ runs:
         echo CCACHE_COMPRESSION="true" >> $GITHUB_ENV
         export CCACHE_COMPRESSLEVEL="3"
         echo CCACHE_COMPRESSION_LEVEL="3" >> $GITHUB_ENV
-        export CCACHE_DIRECT="true"
-        echo CCACHE_DIRECT="true" >> "$GITHUB_ENV"
+        # Direct mode embeds per-VM inode/device numbers into the cache
+        # key, so an object stored on one on-demand runner can never be
+        # found on the next one (observed: run-to-run cross hits ~3%,
+        # "Preprocessed: 0", cache snowballing 0.6 -> 1.2 GB per run).
+        # Preprocessor mode keys on the -E output (source + flags,
+        # paths normalized via CCACHE_BASEDIR/CCACHE_NOHASHDIR) and is
+        # stable across VMs; cost is one cheap -E pass per hit.
+        export CCACHE_DIRECT="false"
+        echo CCACHE_DIRECT="false" >> "$GITHUB_ENV"
         export CCACHE_FILE_CLONE="true"
         echo CCACHE_FILE_CLONE="true" >> "$GITHUB_ENV"
         export CCACHE_INODE_CACHE="true"
