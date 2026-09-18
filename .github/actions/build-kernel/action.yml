@@ -58,6 +58,25 @@ runs:
     run: |
       sed -i 's/check_defconfig//' ./common/build.config.gki
       if [ -f "build/build.sh" ]; then
+        # CC reaches make as a COMMAND-LINE variable ("CC=ccache clang" is
+        # forwarded verbatim through build.sh's MAKE_ARGS into every make
+        # invocation), NOT via the environment.
+        #
+        # Why the environment form is dead: GKI's build.sh honors a
+        # shell-level CC only on its non-LLVM path. GKI kernel builds set
+        # LLVM=1, and that branch hard-resets the shell variable to bare
+        # clang (build/build.sh: `[[ -n "${LLVM}" ]] && CC=clang`), so any
+        # env CC we exported was silently dropped before make ran — the
+        # whole kernel compiled with stock clang and the ccache dir stayed
+        # 0 bytes (Cacheable calls: 0).
+        #
+        # The make-command-line form wins over every assignment inside
+        # kernel/Makefile (only `make -override` could beat it), so
+        # CC="ccache clang" survives LLVM=1 and is the documented GKI way
+        # to hook ccache into an LLVM kernel build. ccache resolves the
+        # second word ("clang") on PATH exactly the way the stock build
+        # did, so nothing about the toolchain changes — only that
+        # every translation unit passes through /home/runner/.ccache.
         BUILD_GKI_ARTIFACTS="" \
         BUILD_GKI_CERTIFICATION_TOOLS=0 \
         BUILD_SYSTEM_DLKM=0 \
@@ -67,12 +86,8 @@ runs:
         OUT_DIR="/home/runner/out" \
         LTO=thin \
         BUILD_CONFIG=common/build.config.gki.aarch64 \
-        CC="/usr/bin/ccache clang" \
-        CXX="/usr/bin/ccache clang++" \
-        HOSTCC="/usr/bin/ccache clang" \
-        HOSTCXX="/usr/bin/ccache clang++" \
         HOSTLDFLAGS="-fuse-ld=lld" \
-        build/build.sh -j"$(nproc)"
+        build/build.sh -j"$(nproc)" "CC=ccache clang"
       else
         sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
         tools/bazel build \
