@@ -77,6 +77,21 @@ runs:
         # second word ("clang") on PATH exactly the way the stock build
         # did, so nothing about the toolchain changes — only that
         # every translation unit passes through /home/runner/.ccache.
+        # Why "ccache" must be whitelisted, not just passed as CC: with
+        # HERMETIC_TOOLCHAIN=1 (our build.config.gki), _setup_env.sh
+        # rebuilds PATH from scratch for the whole make run — it starts
+        # from a host_tools dir symlinking only a fixed allowlist
+        # (bash git perl rsync sh tar + $ADDITIONAL_HOST_TOOLS), then
+        # prepends the prebuilt dirs (CLANG_PREBUILT_BIN etc.). "clang"
+        # and "ld.lld" resolve from prebuilts; "ccache" lives in
+        # /usr/bin and is invisible there, so make dies with
+        # "ccache: No such file or directory" / "compiler 'ccache
+        # clang' not found". The GKI-supported escape hatch is exactly
+        # ADDITIONAL_HOST_TOOLS (documented in build/build.sh, already
+        # used by our BBG fragment for "dd"): it symlinks /usr/bin/ccache
+        # into the allowlist dir before PATH is locked. ccache then runs
+        # the prebuilt clang exactly as the stock build did — only every
+        # translation unit now passes through /home/runner/.ccache.
         BUILD_GKI_ARTIFACTS="" \
         BUILD_GKI_CERTIFICATION_TOOLS=0 \
         BUILD_SYSTEM_DLKM=0 \
@@ -87,6 +102,7 @@ runs:
         LTO=thin \
         BUILD_CONFIG=common/build.config.gki.aarch64 \
         HOSTLDFLAGS="-fuse-ld=lld" \
+        ADDITIONAL_HOST_TOOLS="ccache" \
         build/build.sh -j"$(nproc)" "CC=ccache clang"
       else
         sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
