@@ -19,27 +19,58 @@ runs:
       # to steer the host linker is to put an "ld" on PATH: prebuilt clang
       # invokes the bare name "ld" when building host tools (fixdep, modpost,
       # ...). Source priority:
-      #   1. repo-synced clang ld.lld — GKI manifests sync the toolchain to
-      #      kernel/prebuilts-master/clang/host/linux-x86/clang-<ver>/bin;
-      #      manifests older than ~2023 used kernel/prebuilts/clang, so
-      #      probe both roots.
-      #   2. system binutils ld — every 5.10 LTS build on this pipeline has
-      #      linked with it.
-      #   3. apt-installed binutils — last resort for runner images that
-      #      scrub *llvm*/binutils during disk cleanup.
+      #   1. BUILD-CONFIG CLANG (precise): source the build config the kernel
+      #      actually uses (common/build.config.gki.aarch64 -> build.config.
+      #      common) and read CLANG_PREBUILT_BIN — the clang bin dir the build
+      #      is *supposed* to link with. This asks "which clang does the build
+      #      use" instead of guessing the newest one on disk; a 5.10 tree can
+      #      ship several clangs and the wrong one breaks host-tool linking.
+      #   2. FIND (fallback): if the config chain or toolchain dir is
+      #      incomplete, fall back to the largest ld.lld under prebuilts-*.
+      #   3. SYSTEM / 4. APT: system ld, then apt binutils.
       # All finds are `|| true`-guarded: the runner shell is `bash -e -o
-      # pipefail`, so a find over a missing starting directory (exit 1) or
-      # a SIGPIPE from `head` would kill this step before the fallbacks
-      # ever ran.
+      # pipefail`, so a failing find or a SIGPIPE from `tail` must not kill
+      # this step before the fallbacks run.
       WS="${{ github.workspace }}"
+      KROOT="$WS/kernel"
       LDLLD=""
-      for ROOT in "$WS/kernel/prebuilts-master" "$WS/kernel/prebuilts"; do
-        [ -d "$ROOT" ] || continue
-        LDLLD=$(find "$ROOT" -name "ld.lld" -type f 2>/dev/null | sort -V | tail -n 1 || true)
-        if [ -n "$LDLLD" ]; then
-          break
+
+      # --- Precise locator: ask build.config which clang the build uses. ---
+      # CLANG_PREBUILT_BIN is defined in build.config.common and pulled in by
+      # build.config.gki.aarch64 (its first line sources it) with
+      # ROOT_DIR/KERNEL_DIR set; its value is RELATIVE to the kernel root.
+      CLANG_BIN=""
+      if [ -f "$KROOT/common/build.config.gki.aarch64" ]; then
+        # cd into the kernel root so the configs' relative ". common/..."
+        # sources and their ROOT_DIR/KERNEL_DIR references resolve; this
+        # host-ld step has no working-directory (default = repo root).
+        CLANG_BIN=$(cd "$KROOT" && ROOT_DIR="$KROOT" KERNEL_DIR=common bash -c '
+          [ -f common/build.config.constants ] && . common/build.config.constants
+          . common/build.config.gki.aarch64
+          printf "%s" "$CLANG_PREBUILT_BIN"
+        ' 2>/dev/null || true)
+      fi
+      if [ -n "$CLANG_BIN" ]; then
+        case "$CLANG_BIN" in
+          /*) CBIN="$CLANG_BIN" ;;
+          *)  CBIN="$KROOT/$CLANG_BIN" ;;
+        esac
+        if [ -f "$CBIN/ld.lld" ]; then
+          LDLLD="$CBIN/ld.lld"
+          echo "host ld: build-config clang $LDLLD"
+        else
+          echo "host ld: build-config clang dir $CBIN has no ld.lld; falling back"
         fi
-      done
+      fi
+
+      # --- Fallback: largest ld.lld on disk (config locator empty/unsynced). ---
+      if [ -z "$LDLLD" ]; then
+        for ROOT in "$KROOT/prebuilts-master" "$KROOT/prebuilts"; do
+          [ -d "$ROOT" ] || continue
+          LDLLD=$(find "$ROOT" -name "ld.lld" -type f 2>/dev/null | sort -V | tail -n 1 || true)
+          [ -n "$LDLLD" ] && break
+        done
+      fi
       if [ -n "$LDLLD" ] && [ -x "$LDLLD" ]; then
         sudo ln -sf "$LDLLD" /usr/local/bin/ld
         echo "host ld: repo-synced $LDLLD ($( "$LDLLD" --version 2>/dev/null | head -n 1 ))"
