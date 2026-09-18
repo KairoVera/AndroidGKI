@@ -57,8 +57,11 @@ runs:
         # Preprocessor mode keys on the -E output (source + flags,
         # paths normalized via CCACHE_BASEDIR/CCACHE_NOHASHDIR) and is
         # stable across VMs; cost is one cheap -E pass per hit.
-        export CCACHE_DIRECT="false"
-        echo CCACHE_DIRECT="false" >> "$GITHUB_ENV"
+        # This ccache build (master.8afa91b9) only accepts the
+        # dedicated negation variable CCACHE_NODIRECT — assigning
+        # "false" to CCACHE_DIRECT is rejected as an invalid boolean.
+        export CCACHE_NODIRECT="true"
+        echo CCACHE_NODIRECT="true" >> "$GITHUB_ENV"
         export CCACHE_FILE_CLONE="true"
         echo CCACHE_FILE_CLONE="true" >> "$GITHUB_ENV"
         export CCACHE_INODE_CACHE="true"
