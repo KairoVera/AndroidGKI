@@ -45,7 +45,23 @@ runs:
 
         KMI=""
         if [ "$KEEP_KMI" = "true" ]; then
-          KMI=$(grep -h "^KMI_GENERATION" build.config.common build.config.constants 2>/dev/null | head -n 1 | cut -d= -f2)
+          # KMI_GENERATION lives in build.config.common; on GKI 2.0 trees the
+          # extra value also sits in build.config.constants. The old one-line
+          # `grep -h A B` was safe only when BOTH files exist: GKI 1.x
+          # (5.10/5.15 android12/13) has NO build.config.constants, and GNU
+          # grep then exits 2 on the missing operand. This step runs under
+          # GitHub's default `bash -e -o pipefail`, so a failing command
+          # substitution aborts the WHOLE step silently (stderr already
+          # swallowed by 2>/dev/null) — that is exactly what took down all
+          # 114 android12 jobs in run 35350930804 with zero output, 12ms in.
+          # Probe each candidate file on its own: the [ -f ] guard skips the
+          # missing one, and `|| true` keeps the substitution green so a
+          # truly empty KMI degrades to the warning below instead of aborting.
+          for CFG in build.config.common build.config.constants; do
+            [ -f "$CFG" ] || continue
+            KMI=$(grep "^KMI_GENERATION" "$CFG" 2>/dev/null | head -n 1 | cut -d= -f2 || true)
+            [ -n "$KMI" ] && break
+          done
           if [ -z "$KMI" ]; then
             echo "WARNING: KMI_GENERATION not found, falling back to legacy branding"
           fi
