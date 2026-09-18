@@ -58,6 +58,15 @@ runs:
         if [ -f "$CBIN/ld.lld" ]; then
           LDLLD="$CBIN/ld.lld"
           echo "host ld: build-config clang $LDLLD"
+          # CEILING LAYER: this resolved clang bin dir ships its own ld.lld.
+          # Record it so the Build step can forward HOSTLDFLAGS=-fuse-ld=lld as
+          # a make COMMAND-LINE variable: the clang driver then links host tools
+          # with the ld.lld sitting next to the clang binary itself — self-
+          # contained, needs no PATH entry and no /usr/local/bin symlink, and is
+          # impossible to point at the wrong clang. The 3-tier symlink fallback
+          # below stays as a belt for the case where this assumption (ld.lld
+          # co-located with the resolved clang) ever changes.
+          echo "host_ld_fuse=1" >> "$GITHUB_ENV"
         else
           echo "host ld: build-config clang dir $CBIN has no ld.lld; falling back"
         fi
@@ -157,6 +166,21 @@ runs:
           fi
         done
 
+        # GKI's build.sh re-executes itself under `env -i` with a fixed
+        # variable whitelist, so plain environment variables are stripped —
+        # HOSTLDFLAGS must be passed as a make COMMAND-LINE variable (forwarded
+        # verbatim via MAKE_ARGS="$@" into every make call) for it to survive
+        # (same mechanism as CC="ccache clang").
+        #
+        # -fuse-ld=lld is gated on the host-ld step's `host_ld_fuse` env flag:
+        # it was set ONLY when the build-config resolver confirmed the exact
+        # clang bin dir we'd use ships its own ld.lld. In that case the clang
+        # driver resolves the linker next to the binary (no PATH involvement,
+        # no /usr/local/bin/ld), and the 3-tier symlink belt is still in
+        # effect as a safety net if the prebuilts layout ever diverges. When
+        # the gate is unset (config chain empty, dir not synced, or no ld.lld
+        # beside the resolved clang), we silently fall through to the belt
+        # layers without forcing a linker name the driver can't find.
         BUILD_GKI_ARTIFACTS="" \
         BUILD_GKI_CERTIFICATION_TOOLS=0 \
         BUILD_SYSTEM_DLKM=0 \
@@ -166,9 +190,8 @@ runs:
         OUT_DIR="/home/runner/out" \
         LTO=thin \
         BUILD_CONFIG=common/build.config.gki.aarch64 \
-        HOSTLDFLAGS="-fuse-ld=lld" \
         ADDITIONAL_HOST_TOOLS="ccache" \
-        build/build.sh -j"$(nproc)" "CC=ccache clang" $([ -n "$KSU_PRECFG" ] && echo "$KSU_PRECFG")
+        build/build.sh -j"$(nproc)" "CC=ccache clang" $([ -n "$KSU_PRECFG" ] && echo "$KSU_PRECFG") $([ -n "$host_ld_fuse" ] && echo "HOSTLDFLAGS=-fuse-ld=lld")
       else
         sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
         tools/bazel build \
