@@ -934,11 +934,36 @@ jobs:
       group: update-verified-pins-${{ github.repository }}
       queue: max
       cancel-in-progress: false
-    if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && inputs.commit_mode == 'update'"
+    # Promote-pins job. Its `needs` lists ALL 7 build-android jobs, but the
+    # unselected ones are `skipped`. Verified empirically (run 35106814577):
+    # merely referencing needs.*.result in `if` does NOT bypass GitHub's
+    # auto-skip for skipped dependencies — the job still got skipped. Only the
+    # "always" family of functions (always()/!cancelled()) forces evaluation.
+    # `always() && !cancelled()`: evaluate on any non-cancelled run, then
+    # decide ourselves — a selected sublevel that FAILED is 'failure' (blocks
+    # promotion, preserving "write pins only when everything built green");
+    # an unselected sublevel is 'skipped' (allowed).
+    if: |
+      ${{ always()
+        && !cancelled()
+        && github.event_name == 'workflow_dispatch'
+        && !inputs.test_release_notes
+        && inputs.commit_mode == 'update'
+        && needs.resolve-sources.result == 'success'
+        && (needs.build-android12-5-10.result == 'success' || needs.build-android12-5-10.result == 'skipped')
+        && (needs.build-android13-5-10.result == 'success' || needs.build-android13-5-10.result == 'skipped')
+        && (needs.build-android13-5-15.result == 'success' || needs.build-android13-5-15.result == 'skipped')
+        && (needs.build-android14-5-15.result == 'success' || needs.build-android14-5-15.result == 'skipped')
+        && (needs.build-android14-6-1.result == 'success' || needs.build-android14-6-1.result == 'skipped')
+        && (needs.build-android15-6-6.result == 'success' || needs.build-android15-6-6.result == 'skipped')
+        && (needs.build-android16-6-12.result == 'success' || needs.build-android16-6-12.result == 'skipped')
+      }}
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: write
+    # No job-level permissions block: this job pushes a commit that modifies
+    # .github/workflows/main.yml (the PIN_* block), which needs the
+    # `workflows` scope — only grantable at the workflow level. Any job-level
+    # permissions block would override the workflow level and drop it (run
+    # 35108402243: "without `workflows` permission"). Inherit instead.
     needs:
     - resolve-sources
     - build-android12-5-10
@@ -974,18 +999,60 @@ jobs:
     - name: Commit promoted pins
       if: always() && steps.promote.conclusion == 'success'
       shell: bash
+      env:
+        # The promoted commit modifies .github/workflows/main.yml (the PIN_*
+        # block), which GITHUB_TOKEN cannot push (it lacks the `workflows`
+        # scope, and `workflows` is not grantable via a permissions: key at any
+        # level — the schema rejects it). Use the repo-scoped fine-grained PAT
+        # stored as the CI_PROMOTE_TOKEN secret instead; referencing it via
+        # secrets.* keeps the value redacted in logs.
+        CI_PROMOTE_TOKEN: ${{ secrets.CI_PROMOTE_TOKEN }}
       run: |
         set -euo pipefail
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        STAMP="$(date -u +%Y-%m-%dT%H%M%SZ)"
-        git add .github/workflows/main.yml .github/pins/history
-        if git diff --cached --quiet; then
+        # The promote step already rewrote main.yml and dropped a
+        # .github/pins/history record into the working tree. Detect exactly
+        # which files changed with a local `git status` (no network, no auth —
+        # safe), then land the commit over the Contents API, NOT `git push`.
+        #
+        # Why not git push: actions/checkout injects GITHUB_TOKEN via a
+        # per-credential config file pulled in by `includeIf.gitdir`, which
+        # sets http.https://github.com/.extraheader = AUTHORIZATION: basic
+        # <GITHUB_TOKEN>. That injected header overrides credentials embedded
+        # in the URL, so pull/push still went out under the GitHub App token,
+        # which the server refuses for any commit touching .github/workflows/
+        # ("without `workflows` permission" — a scope no `permissions:` key
+        # can grant GITHUB_TOKEN).
+        #
+        # Why not POST /repos/{owner}/{repo}/commits (the "create commit with
+        # files[]" endpoint): it is NOT on GitHub's list of endpoints
+        # available to fine-grained personal access tokens — a fine-grained
+        # token gets a 404 (GitHub hides token-permission gaps behind 404,
+        # not 403, to prevent probing). The fine-grained-friendly write path
+        # is PUT /repos/{owner}/{repo}/contents/{path} ("create or update
+        # file contents"): it needs Contents:write, plus Workflows:write
+        # when the path is under .github/workflows/ — exactly the two
+        # scopes CI_PROMOTE_TOKEN grants. Plain HTTPS, PAT in the
+        # Authorization header — the same channel nightly-release already
+        # uses successfully.
+        #
+        # See .github/scripts/commit_promoted_pins.py (which carries the
+        # sha-of-existing-file rule: updating a file must send its current
+        # blob sha from the repo, new files omit it).
+        echo "CI_PROMOTE_TOKEN length: ${#CI_PROMOTE_TOKEN}"
+        # --untracked-files=all: list each new history file individually, not
+        # a collapsed "?? .github/pins/history/" directory (the Contents API
+        # commits one path per request).
+        CHANGED="$(git status --porcelain --untracked-files=all .github/workflows/main.yml .github/pins/history 2>/dev/null | awk '{print $2}')"
+        if [ -z "${CHANGED//[[:space:]]/}" ]; then
           echo "No pin changes to commit."
           exit 0
         fi
-        git commit -m "chore(pins): promote verified commits to latest built (${STAMP})"
-        git push
+        echo "Promoted files:"
+        printf '  %s\n' $CHANGED
+        STAMP="$(date -u +%Y-%m-%dT%H%M%SZ)"
+        # shellcheck disable=SC2086  # unquoted $CHANGED word-splits into argv
+        python3 .github/scripts/commit_promoted_pins.py \
+          "chore(pins): promote verified commits to latest built (${STAMP})" $CHANGED
   rej:
     if: "github.event_name == 'workflow_dispatch' && !inputs.test_release_notes && always()"
     runs-on: ubuntu-latest
@@ -1503,9 +1570,13 @@ jobs:
 
       - name: Replace nightly prerelease
         env:
-          GH_TOKEN: ${{ github.token }}
+          # gh release create/delete 403'd under GITHUB_TOKEN (needs a scope it
+          # lacks here); the repo-scoped fine-grained PAT in CI_PROMOTE_TOKEN
+          # carries it. git push --delete / ls-remote also ride the same PAT.
+          GH_TOKEN: ${{ secrets.CI_PROMOTE_TOKEN }}
         run: |
           set -e
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/KairoVera/AndroidGKI.git"
           gh release delete nightly --cleanup-tag -y || true
           if git ls-remote --tags origin nightly | grep -q 'refs/tags/nightly'; then
             git push --delete origin nightly || true
