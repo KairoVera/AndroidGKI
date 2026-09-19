@@ -89,6 +89,40 @@ runs:
     run: |
       sed -i 's/check_defconfig//' ./common/build.config.gki
       if [ -f "build/build.sh" ]; then
+        # ---- KernelSU-Next Kbuild disjunction guard (port of dev 43413846) ----
+        # The SUSFS-flavored Next source (pershoot/KernelSU-Next dev-susfs)
+        # ships a two-level guard at the top of its Kbuild:
+        #     ifneq ($(strip $(CONFIG_KPROBES)),y)
+        #     ifneq ($(strip $(CONFIG_KSU_SUSFS)),y)
+        #     $(error "KernelSU requires either CONFIG_KPROBES=y or CONFIG_KSU_SUSFS=y")
+        # GKI's build.sh runs `make mrproper` *before* `gki_defconfig`, so in
+        # that clean window no .config exists yet, both variables are empty,
+        # and the guard aborts the build before defconfig sets CONFIG_KSU_SUSFS=y.
+        #
+        # Upstream's own fix (e14ff0de: sed error->warning, gated on
+        # flavor==next) matches the English message, so it silently no-ops if
+        # the wording changes and prints a warning on every Next build.
+        #
+        # We instead satisfy the disjunction at the make layer. The symbol
+        # CONFIG_KSU_SUSFS appears in the Kbuild only in the SUSFS variant
+        # (plain Next never mentions it), so its presence is a clean
+        # discriminator: if found, forward CONFIG_KSU_SUSFS=y as a build.sh
+        # argument. build.sh forwards extra arguments verbatim into every
+        # make invocation (MAKE_ARGS=("$@"), same mechanism as the CC=
+        # variable on dev), so the guard sees it = y and is skipped with no warning. That value is exactly what
+        # defconfig sets for the SUSFS variant, so the final artifacts are
+        # unchanged; the Kbuild source is left untouched; and if upstream drops
+        # the guard the argument becomes a harmless dead variable.
+        KSU_PRECFG=""
+        for kb in "common/drivers/kernelsu/Kbuild" "drivers/kernelsu/Kbuild"; do
+          [ -f "$kb" ] || continue
+          if grep -q 'CONFIG_KSU_SUSFS' "$kb"; then
+            KSU_PRECFG="CONFIG_KSU_SUSFS=y"
+            echo "[+] $kb references CONFIG_KSU_SUSFS -> pre-satisfying the mrproper guard"
+            break
+          fi
+        done
+
         BUILD_GKI_ARTIFACTS="" \
         BUILD_GKI_CERTIFICATION_TOOLS=0 \
         BUILD_SYSTEM_DLKM=0 \
@@ -102,7 +136,7 @@ runs:
         CXX="/usr/bin/ccache clang++" \
         HOSTCC="/usr/bin/ccache clang" \
         HOSTCXX="/usr/bin/ccache clang++" \
-        build/build.sh -j"$(nproc)"
+        build/build.sh -j"$(nproc)" $([ -n "$KSU_PRECFG" ] && echo "$KSU_PRECFG")
       else
         sed -i '/name = "kernel_aarch64",/a\    check_defconfig = "disabled",' common/BUILD.bazel
         tools/bazel build \
