@@ -56,6 +56,11 @@ on:
         required: false
         type: string
         default: Wild
+      keep_kmi:
+        description: "Keep stock KMI generation suffix in kernel version (fix #265)"
+        required: false
+        type: boolean
+        default: false
       bypass:
         description: "Apply the kernel version-check bypass hack (disabled by default)"
         required: false
@@ -181,6 +186,7 @@ jobs:
       anykernel3_commit: ${{ inputs.anykernel3_commit }}
       droidspaces_commit: ${{ inputs.droidspaces_commit }}
       brand_name: ${{ inputs.brand_name }}
+      keep_kmi: ${{ inputs.keep_kmi }}
       bypass: ${{ inputs.bypass }}
       use_cache: ${{ inputs.use_cache }}
     secrets: inherit
