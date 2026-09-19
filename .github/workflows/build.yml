@@ -66,7 +66,7 @@ on:
       keep_kmi:
         required: false
         type: boolean
-        default: false
+        default: true
       bypass:
         required: false
         type: boolean

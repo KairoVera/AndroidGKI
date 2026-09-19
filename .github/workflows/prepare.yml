@@ -60,7 +60,7 @@ on:
         description: "Keep stock KMI generation suffix in kernel version (fix #265)"
         required: false
         type: boolean
-        default: false
+        default: true
       bypass:
         description: "Apply the kernel version-check bypass hack (disabled by default)"
         required: false
