@@ -148,8 +148,27 @@ runs:
         # Modify the Kbuild in the ReSukiSU checkout so the change propagates
         # through the symlink into bazel sandbox.
         for d in ReSukiSU/kernel; do
-          if [ -f "$d/Kbuild" ] && grep -q 'You should use \$(REPO_NAME) as a git submodule instead of copying code directly' "$d/Kbuild"; then
-            sed -i 's/\$(error You should use \$(REPO_NAME) as a git submodule instead of copying code directly)/\$(warning You should use \$(REPO_NAME) as a git submodule instead of copying code directly)/' "$d/Kbuild"
+          if [ -f "$d/Kbuild" ] && grep -q 'You should use \$\(REPO_NAME\) as a git submodule instead of copying code directly' "$d/Kbuild"; then
+            sed -i 's/\$(error You should use \$\(REPO_NAME\) as a git submodule instead of copying code directly)/\$(warning You should use \$\(REPO_NAME\) as a git submodule instead of copying code directly)/' "$d/Kbuild"
             echo "Softened ReSukiSU submodule check in $d/Kbuild"
           fi
         done
+
+    - name: Backfill missing arch.h for SukiSU-Ultra builtin
+      if: inputs.flavor == 'sukisu-ultra'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        # SukiSU-Ultra builtin branch has #include "arch.h" in kernel/kernel_includes.h
+        # since commit 486ad6f29 (Sep 21) but never committed kernel/include/arch.h.
+        # main branch has it. Backfill here so the kernel build succeeds.
+        if [ ! -f "SukiSU-Ultra/kernel/include/arch.h" ]; then
+          echo "[*] Backfilling kernel/include/arch.h from SukiSU-Ultra main branch"
+          mkdir -p SukiSU-Ultra/kernel/include
+          curl -fsSL "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/include/arch.h" \
+            -o SukiSU-Ultra/kernel/include/arch.h
+          chmod 644 SukiSU-Ultra/kernel/include/arch.h
+          ls -la SukiSU-Ultra/kernel/include/arch.h
+        else
+          echo "[*] arch.h already present, skipping backfill"
+        fi
