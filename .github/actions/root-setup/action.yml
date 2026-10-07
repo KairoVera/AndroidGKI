@@ -172,3 +172,39 @@ runs:
         else
           echo "[*] arch.h already present, skipping backfill"
         fi
+
+    - name: Patch missing EVENT_SERVICES for SukiSU-Ultra builtin on 5.10
+      if: inputs.flavor == 'sukisu-ultra'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        # builtin branch supercall.h is missing EVENT_SERVICES (only main has it).
+        # Add it so dispatch.c compiles. Only needed for 5.10 kernels where
+        # builtin hasn't picked up the main uapi changes yet.
+        SUPERCALL_H="SukiSU-Ultra/kernel/include/uapi/supercall.h"
+        if grep -q "EVENT_MODULE_MOUNTED" "$SUPERCALL_H" && ! grep -q "EVENT_SERVICES" "$SUPERCALL_H"; then
+          echo "[*] Adding EVENT_SERVICES to $SUPERCALL_H"
+          sed -i '/DECLARE(__u32, EVENT_MODULE_MOUNTED, 3);/a DECLARE(__u32, EVENT_SERVICES, 4);' "$SUPERCALL_H"
+        else
+          echo "[*] EVENT_SERVICES already present or not needed, skipping"
+        fi
+
+    - name: Patch duplicate declaration in rules.c for SukiSU-Ultra builtin
+      if: inputs.flavor == 'sukisu-ultra'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        # builtin branch rules.c has a double declaration of pol/old_pol:
+        #   line 154: struct selinux_policy *pol, *old_pol;
+        #   line 162: struct selinux_policy *pol, *old_pol = selinux_state.policy;
+        # Remove the redundant redeclaration inside the #if block to fix the build.
+        RULES_C="SukiSU-Ultra/kernel/selinux/rules.c"
+        if grep -n "struct selinux_policy \*pol, \*old_pol;" "$RULES_C" | head -2 | wc -l | grep -q "2"; then
+          echo "[*] Removing duplicate pol/old_pol declaration in $RULES_C"
+          # Remove the second occurrence (line with = selinux_state.policy)
+          sed -i '/struct selinux_policy \*pol, \*old_pol = selinux_state.policy;/d' "$RULES_C"
+          # Also remove the extra = selinux_state.policy from the next line if it exists
+          sed -i 's/\*old_pol = selinux_state.policy;*/\*old_pol;/' "$RULES_C"
+        else
+          echo "[*] Duplicate declaration not detected, skipping"
+        fi
