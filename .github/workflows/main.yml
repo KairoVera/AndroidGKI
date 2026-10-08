@@ -493,19 +493,28 @@ jobs:
                   "$flavor" "$owner" "$repo" "$run_id" "$stock"
                 ;;
               sukisu-ultra)
-                owner="SukiSU-Ultra"; repo="SukiSU-Ultra"; wf="build-manager.yml"
-                stock=$(git ls-remote https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main | awk '{print $1; exit}')
+                # Use fork's builtin branch for both kernel and manager to ensure API compatibility
+                owner="KairoVera"; repo="SukiSU-Ultra"; wf="build-manager.yml"
+                stock=$(git ls-remote https://github.com/KairoVera/SukiSU-Ultra.git refs/heads/builtin | awk '{print $1; exit}')
                 run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
-                  echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
-                  fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
+                  echo "No manager build for builtin ${stock}, falling back to latest successful run" >&2
+                  fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=builtin&status=success&per_page=1")
                   run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
                   stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
                   if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
-                  if [[ -z "${run_id}" ]]; then
-                    echo "ERROR: no ${repo} manager build exists for stock commit ${stock}" >&2
-                    exit 1
+                  if [[ -z "$run_id" ]]; then
+                    echo "WARNING: no manager build found for fork builtin, will use upstream main" >&2
+                    owner="SukiSU-Ultra"; repo="SukiSU-Ultra"; wf="build-manager.yml"
+                    stock=$(git ls-remote https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main | awk '{print $1; exit}')
+                    run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                      --jq '.workflow_runs[0].id // empty')
+                    if [[ -z "$run_id" ]]; then
+                      fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
+                      run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
+                      stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
+                    fi
                   fi
                 fi
                 printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"Manager,Spoofed-Manager"}' \

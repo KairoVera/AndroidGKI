@@ -40,6 +40,16 @@ on:
         required: false
         type: string
         default: ""
+      sukisu_ultra_repo:
+        description: "Custom SukiSU-Ultra repo (default: SukiSU-Ultra/SukiSU-Ultra)"
+        required: false
+        type: string
+        default: "SukiSU-Ultra/SukiSU-Ultra"
+      sukisu_ultra_branch:
+        description: "Custom SukiSU-Ultra branch (default: main, use builtin for kernel compatibility)"
+        required: false
+        type: string
+        default: "main"
       kernelsu_next_susfs_commit:
         description: "Pin KernelSU-Next SUSFS (pershoot dev-susfs) manager to this commit (40-char SHA, empty = latest dev-susfs tip)"
         required: false
@@ -106,6 +116,8 @@ jobs:
           INPUT_KSU_COMMIT: ${{ inputs.kernelsu_commit }}
           INPUT_RESUKISU_COMMIT: ${{ inputs.resukisu_commit }}
           INPUT_SUKISU_ULTRA_COMMIT: ${{ inputs.sukisu_ultra_commit }}
+          INPUT_SUKISU_ULTRA_REPO: ${{ inputs.sukisu_ultra_repo }}
+          INPUT_SUKISU_ULTRA_BRANCH: ${{ inputs.sukisu_ultra_branch }}
           INPUT_NEXT_SUSFS_COMMIT: ${{ inputs.kernelsu_next_susfs_commit }}
         run: |
           set -euo pipefail
@@ -184,7 +196,7 @@ jobs:
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_KSU_COMMIT:-}" ]]; then
                     echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
-                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
+                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=${branch}&status=success&per_page=1")
                     run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
                     stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
                     if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
@@ -258,7 +270,7 @@ jobs:
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_RESUKISU_COMMIT:-}" ]]; then
                     echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
-                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
+                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=${branch}&status=success&per_page=1")
                     run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
                     stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
                     if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
@@ -273,7 +285,20 @@ jobs:
                 ;;
 
               sukisu-ultra)
-                owner="SukiSU-Ultra"; repo="SukiSU-Ultra"; wf="build-manager.yml"
+                # Parse custom repo if provided (format: "owner/repo")
+                if [[ -n "${INPUT_SUKISU_ULTRA_REPO:-}" ]]; then
+                  owner="${INPUT_SUKISU_ULTRA_REPO%%/*}"
+                  repo="${INPUT_SUKISU_ULTRA_REPO##*/}"
+                else
+                  owner="SukiSU-Ultra"; repo="SukiSU-Ultra"
+                fi
+                # Use custom branch or default to main
+                if [[ -n "${INPUT_SUKISU_ULTRA_BRANCH:-}" ]]; then
+                  branch="${INPUT_SUKISU_ULTRA_BRANCH}"
+                else
+                  branch="main"
+                fi
+                wf="build-manager.yml"
                 if [[ -n "${INPUT_SUKISU_ULTRA_COMMIT:-}" ]]; then
                   stock="$INPUT_SUKISU_ULTRA_COMMIT"
                   if ! [[ "$stock" =~ ^[0-9a-f]{40}$ ]]; then
@@ -281,14 +306,14 @@ jobs:
                     exit 1
                   fi
                 else
-                  stock=$(resolve_sha https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main)
+                  stock=$(resolve_sha "https://github.com/${INPUT_SUKISU_ULTRA_REPO:-SukiSU-Ultra/SukiSU-Ultra}.git" "refs/heads/${branch:-main}")
                 fi
                 run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
                   if [[ -z "${INPUT_SUKISU_ULTRA_COMMIT:-}" ]]; then
                     echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
-                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
+                    fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=${branch}&status=success&per_page=1")
                     run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
                     stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
                     if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
