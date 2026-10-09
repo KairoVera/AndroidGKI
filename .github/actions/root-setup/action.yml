@@ -24,10 +24,12 @@ runs:
         {
           echo "=== root-setup debug ==="
           echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "INPUT_FLAVOR=${{ inputs.flavor }}"
+          echo "INPUT_COMMIT=${{ inputs.commit }}"
           echo "flavor=$flavor"
           echo "expected_commit=${expected_commit}"
           echo "commit_len=${#expected_commit}"
-          echo "pwd=$PWD"
+          echo "PWD=$PWD"
           echo "github.workspace=${{ github.workspace }}"
           echo ""
           echo "=== Directory contents ==="
@@ -45,6 +47,9 @@ runs:
               echo "NOT_FOUND: $candidate"
             fi
           done
+          echo ""
+          echo "=== Case statement result ==="
+          echo "About to enter case statement..."
         } | tee /tmp/root-setup-debug.log
 
         case "$flavor" in
