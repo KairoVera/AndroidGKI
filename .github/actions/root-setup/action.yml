@@ -135,18 +135,6 @@ runs:
         echo "=== Attempting git clone ==="
         git clone --no-checkout "$repo" "$directory" 2>&1
         echo "[*] Clone exit code: $?"
-
-        echo "=== Attempting git clone ==="
-        echo "repo=$repo"
-        echo "directory=$directory"
-        
-        if git clone --no-checkout "$repo" "$directory" 2>/tmp/git-clone-error.log; then
-          echo "[*] git clone succeeded"
-        else
-          echo "[!] git clone FAILED:" >&2
-          cat /tmp/git-clone-error.log >&2
-          exit 1
-        fi
         
         if git -C "$directory" fetch --depth=1 origin "$expected_commit" 2>/tmp/git-fetch-error.log; then
           echo "[*] git fetch succeeded"
