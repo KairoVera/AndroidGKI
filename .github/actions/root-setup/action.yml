@@ -116,10 +116,6 @@ runs:
           echo "Refusing to replace an existing kernelsu integration." >&2
           exit 1
         fi
-        if [ -e "$directory" ]; then
-          echo "Refusing to reuse an existing root checkout: $directory." >&2
-          exit 1
-        fi
 
         echo "=== DEBUG: About to clone ==="
         echo "repo=$repo"
