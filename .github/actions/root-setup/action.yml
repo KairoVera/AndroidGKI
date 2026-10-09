@@ -116,6 +116,16 @@ runs:
           exit 1
         fi
 
+        echo "=== DEBUG: About to clone ==="
+        echo "repo=$repo"
+        echo "directory=$directory"
+        echo "expected_commit=$expected_commit"
+        echo "PWD=$PWD"
+        echo "==="
+        echo "Attempting git clone..."
+        git clone --no-checkout "$repo" "$directory" 2>&1
+        echo "[*] Clone exit code: $?"
+
         echo "=== Attempting git clone ==="
         echo "repo=$repo"
         echo "directory=$directory"
