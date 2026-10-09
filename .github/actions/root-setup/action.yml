@@ -45,6 +45,12 @@ runs:
             directory="KowSU"
             manager="KowSU Manager"
             ;;
+          sukisu-ultra-custom)
+            # Use custom-main branch from fork with SUSFS integration patches
+            repo="https://github.com/KairoVera/SukiSU-Ultra.git"
+            directory="SukiSU-Ultra-Custom"
+            manager="SukiSU-Ultra-Custom Manager"
+            ;;
           *)
             echo "Unsupported root flavor: $flavor" >&2
             exit 2
@@ -56,7 +62,7 @@ runs:
           exit 2
         fi
 
-        for candidate in KernelSU KernelSU-Next ReSukiSU SukiSU-Ultra KowSU; do
+        for candidate in KernelSU KernelSU-Next ReSukiSU SukiSU-Ultra SukiSU-Ultra-Custom KowSU; do
           if [ "$candidate" != "$directory" ] && [ -e "$candidate" ]; then
             echo "Refusing mixed root implementations: found $candidate." >&2
             exit 1
@@ -207,4 +213,25 @@ runs:
           sed -i 's/\*old_pol = selinux_state.policy;*/\*old_pol;/' "$RULES_C"
         else
           echo "[*] Duplicate declaration not detected, skipping"
+        fi
+
+    - name: Apply SUSFS patches for SukiSU-Ultra-Custom (custom-main)
+      if: inputs.flavor == 'sukisu-ultra-custom'
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        # custom-main branch includes susfs-patches submodule with SUSFS integration
+        # Apply KSU module patches for new Kbuild architecture
+        if [ -d "SukiSU-Ultra-Custom/kernel/susfs-patches" ]; then
+          echo "[*] Found susfs-patches submodule, applying KSU module patches"
+          cd SukiSU-Ultra-Custom/kernel
+          for patch in susfs-patches/kernel_patches/KernelSU/2*.patch; do
+            if [ -f "$patch" ]; then
+              echo "[*] Applying $patch"
+              patch -p1 < "$patch" || echo "[!] Failed to apply $patch, continuing..."
+            fi
+          done
+        else
+          echo "[*] susfs-patches submodule not found, skipping KSU module patches"
+          echo "[*] GKI kernel patches should be applied by AndroidGKI workflow"
         fi
