@@ -19,6 +19,14 @@ runs:
 
         flavor="${{ inputs.flavor }}"
         expected_commit="${{ inputs.commit }}"
+
+        # Debug: print inputs
+        echo "[*] root-setup inputs:"
+        echo "    flavor=$flavor"
+        echo "    commit=${expected_commit:0:12}... (len=${#expected_commit})"
+        echo "    pwd=$PWD"
+        echo "    github.workspace=${{ github.workspace }}"
+
         case "$flavor" in
           kernelsu)
             repo="https://github.com/tiann/KernelSU.git"
