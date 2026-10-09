@@ -83,6 +83,7 @@ on:
           - KernelSU
           - ReSukiSU
           - SukiSU-Ultra
+          - SukiSU-Ultra-Custom
           - KowSU
           - No Root
           - All (KernelSU-Next + KernelSU + ReSukiSU)
@@ -241,6 +242,7 @@ jobs:
           PIN_KERNELSU="08a3b087e49227c8a6731c5f1114998b5e25255b"
           PIN_RESUKISU="94dd3c93c2053a84fd752df6eb85db99b7d70ab8"
           PIN_SUKISU_ULTRA="70fa0e092a2c81060823f8ae526eac14fdda2930"
+          PIN_SUKISU_ULTRA_CUSTOM="79ea7b72e1a2b3c4d5f6a7b8c9d0e1f2a3b4c5d6"
           declare -A PIN_SUSFS=(
             [susfs_commit_android12_5_10]="9892175b4acec7ee844e113b8d02c0f4d12cdfac"
             [susfs_commit_android13_5_10]="5326e21a7eb232f9e21debdd5164e99bee3d1e2f"
@@ -358,6 +360,13 @@ jobs:
               echo "root_flavor=sukisu-ultra" >> "$GITHUB_OUTPUT"
               emit root_commit "$SUKISU_ULTRA_COMMIT"
               ROOT_MATRIX="[$(mk_entry sukisu-ultra SukiSU-Ultra "$SUKISU_ULTRA_COMMIT")]"
+              ;;
+            SukiSU-Ultra-Custom)
+              # Use custom-main branch with SUSFS integration patches
+              SUKISU_ULTRA_CUSTOM_COMMIT="$(pick "$PIN_SUKISU_ULTRA_CUSTOM" https://github.com/KairoVera/SukiSU-Ultra.git refs/heads/custom-main)"
+              echo "root_flavor=sukisu-ultra" >> "$GITHUB_OUTPUT"
+              emit root_commit "$SUKISU_ULTRA_CUSTOM_COMMIT"
+              ROOT_MATRIX="[$(mk_entry sukisu-ultra-custom SukiSU-Ultra-Custom "$SUKISU_ULTRA_CUSTOM_COMMIT")]"
               ;;
             KowSU)
               if [ "${{ inputs.use_susfs }}" = "true" ]; then
@@ -506,6 +515,34 @@ jobs:
                   if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
                   if [[ -z "$run_id" ]]; then
                     echo "WARNING: no manager build found for fork builtin, will use upstream main" >&2
+                    owner="SukiSU-Ultra"; repo="SukiSU-Ultra"; wf="build-manager.yml"
+                    stock=$(git ls-remote https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main | awk '{print $1; exit}')
+                    run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                      --jq '.workflow_runs[0].id // empty')
+                    if [[ -z "$run_id" ]]; then
+                      fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
+                      run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
+                      stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
+                    fi
+                  fi
+                fi
+                printf '{"flavor":"%s","owner":"%s","repo":"%s","source":"run","run_id":%s,"stock":"%s","want":"Manager,Spoofed-Manager"}' \
+                  "$flavor" "$owner" "$repo" "$run_id" "$stock"
+                ;;
+              sukisu-ultra-custom)
+                # Use custom-main branch with SUSFS integration
+                owner="KairoVera"; repo="SukiSU-Ultra"; wf="build-manager.yml"
+                stock=$(git ls-remote https://github.com/KairoVera/SukiSU-Ultra.git refs/heads/custom-main | awk '{print $1; exit}')
+                run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
+                  --jq '.workflow_runs[0].id // empty')
+                if [[ -z "${run_id}" ]]; then
+                  echo "No manager build for custom-main ${stock}, falling back to latest successful run" >&2
+                  fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=custom-main&status=success&per_page=1")
+                  run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
+                  stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
+                  if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
+                  if [[ -z "$run_id" ]]; then
+                    echo "WARNING: no manager build found for fork custom-main, will use upstream main" >&2
                     owner="SukiSU-Ultra"; repo="SukiSU-Ultra"; wf="build-manager.yml"
                     stock=$(git ls-remote https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main | awk '{print $1; exit}')
                     run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
