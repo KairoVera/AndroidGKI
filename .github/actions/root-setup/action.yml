@@ -116,14 +116,42 @@ runs:
           exit 1
         fi
 
-        git clone --no-checkout "$repo" "$directory"
-        git -C "$directory" fetch --depth=1 origin "$expected_commit"
-        git -C "$directory" checkout --detach "$expected_commit"
+        echo "=== Attempting git clone ==="
+        echo "repo=$repo"
+        echo "directory=$directory"
+        
+        if git clone --no-checkout "$repo" "$directory" 2>/tmp/git-clone-error.log; then
+          echo "[*] git clone succeeded"
+        else
+          echo "[!] git clone FAILED:" >&2
+          cat /tmp/git-clone-error.log >&2
+          exit 1
+        fi
+        
+        if git -C "$directory" fetch --depth=1 origin "$expected_commit" 2>/tmp/git-fetch-error.log; then
+          echo "[*] git fetch succeeded"
+        else
+          echo "[!] git fetch FAILED:" >&2
+          cat /tmp/git-fetch-error.log >&2
+          exit 1
+        fi
+        
+        if git -C "$directory" checkout --detach "$expected_commit" 2>/tmp/git-checkout-error.log; then
+          echo "[*] git checkout succeeded"
+        else
+          echo "[!] git checkout FAILED:" >&2
+          cat /tmp/git-checkout-error.log >&2
+          exit 1
+        fi
+        
         actual_commit="$(git -C "$directory" rev-parse HEAD)"
+        echo "[*] actual_commit=$actual_commit"
+        
         if [ "$actual_commit" != "$expected_commit" ]; then
           echo "Root commit mismatch: expected $expected_commit, got $actual_commit." >&2
           exit 1
         fi
+        echo "[*] Commit verified successfully"
 
         # custom-main uses standard Kbuild (multiple source files), while builtin
         # uses unity build (single ksu.c). Detect the variant and configure accordingly.
