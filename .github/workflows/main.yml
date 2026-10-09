@@ -364,7 +364,7 @@ jobs:
             SukiSU-Ultra-Custom)
               # Use custom-main branch with SUSFS integration patches
               SUKISU_ULTRA_CUSTOM_COMMIT="$(pick "$PIN_SUKISU_ULTRA_CUSTOM" https://github.com/KairoVera/SukiSU-Ultra.git refs/heads/custom-main)"
-              echo "root_flavor=sukisu-ultra" >> "$GITHUB_OUTPUT"
+              echo "root_flavor=sukisu-ultra-custom" >> "$GITHUB_OUTPUT"
               emit root_commit "$SUKISU_ULTRA_CUSTOM_COMMIT"
               ROOT_MATRIX="[$(mk_entry sukisu-ultra-custom SukiSU-Ultra-Custom "$SUKISU_ULTRA_CUSTOM_COMMIT")]"
               ;;
