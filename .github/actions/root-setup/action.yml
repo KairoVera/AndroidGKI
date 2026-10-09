@@ -239,18 +239,10 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
-        # custom-main branch includes susfs-patches submodule with SUSFS integration
-        # Initialize submodule first
-        if [ -f "SukiSU-Ultra-Custom/.gitmodules" ]; then
-          echo "[*] Initializing git submodules in SukiSU-Ultra-Custom"
-          cd SukiSU-Ultra-Custom
-          git submodule update --init --recursive
-          cd ../..
-        fi
-
+        # custom-main branch includes susfs-patches with SUSFS integration
         # Apply KSU module patches for new Kbuild architecture
         if [ -d "SukiSU-Ultra-Custom/kernel/susfs-patches" ]; then
-          echo "[*] Found susfs-patches submodule, applying KSU module patches"
+          echo "[*] Found susfs-patches directory, applying KSU module patches"
           cd SukiSU-Ultra-Custom/kernel
           for patch in susfs-patches/kernel_patches/KernelSU/2*.patch; do
             if [ -f "$patch" ]; then
@@ -259,6 +251,6 @@ runs:
             fi
           done
         else
-          echo "[*] susfs-patches submodule not found, skipping KSU module patches"
+          echo "[*] susfs-patches directory not found, skipping KSU module patches"
           echo "[*] GKI kernel patches should be applied by AndroidGKI workflow"
         fi
