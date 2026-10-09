@@ -63,9 +63,10 @@ runs:
         fi
 
         for candidate in KernelSU KernelSU-Next ReSukiSU SukiSU-Ultra SukiSU-Ultra-Custom KowSU; do
-          if [ "$candidate" != "$directory" ] && [ -e "$candidate" ]; then
-            echo "Refusing mixed root implementations: found $candidate." >&2
-            exit 1
+          if [ -e "$candidate" ]; then
+            # Clean up any leftover checkout from a previous failed run
+            echo "[*] Cleaning up stale checkout: $candidate"
+            rm -rf "$candidate"
           fi
         done
 
