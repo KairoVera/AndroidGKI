@@ -126,8 +126,13 @@ runs:
         echo "directory=$directory"
         echo "expected_commit=$expected_commit"
         echo "PWD=$PWD"
-        echo "==="
-        echo "Attempting git clone..."
+        echo ""
+        echo "=== Checking for existing directory ==="
+        if [ -d "$directory" ]; then
+          echo "[!] Directory exists, removing..."
+          rm -rf "$directory"
+        fi
+        echo "=== Attempting git clone ==="
         git clone --no-checkout "$repo" "$directory" 2>&1
         echo "[*] Clone exit code: $?"
 
