@@ -20,12 +20,32 @@ runs:
         flavor="${{ inputs.flavor }}"
         expected_commit="${{ inputs.commit }}"
 
-        # Debug: print inputs
-        echo "[*] root-setup inputs:"
-        echo "    flavor=$flavor"
-        echo "    commit=${expected_commit:0:12}... (len=${#expected_commit})"
-        echo "    pwd=$PWD"
-        echo "    github.workspace=${{ github.workspace }}"
+        # Debug: print inputs and capture to file for artifact
+        {
+          echo "=== root-setup debug ==="
+          echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "flavor=$flavor"
+          echo "expected_commit=${expected_commit}"
+          echo "commit_len=${#expected_commit}"
+          echo "pwd=$PWD"
+          echo "github.workspace=${{ github.workspace }}"
+          echo ""
+          echo "=== Directory contents ==="
+          ls -la "$PWD" || true
+          echo ""
+          echo "=== common/drivers exists ==="
+          [ -d "common/drivers" ] && echo "YES" || echo "NO"
+          [ -d "drivers" ] && echo "drivers exists: YES" || echo "drivers exists: NO"
+          echo ""
+          echo "=== Candidate directories ==="
+          for candidate in KernelSU KernelSU-Next ReSukiSU SukiSU-Ultra SukiSU-Ultra-Custom KowSU; do
+            if [ -e "$candidate" ]; then
+              echo "FOUND: $candidate ($(ls -ld "$candidate" | awk '{print $NF}'))"
+            else
+              echo "NOT_FOUND: $candidate"
+            fi
+          done
+        } | tee /tmp/root-setup-debug.log
 
         case "$flavor" in
           kernelsu)
@@ -263,3 +283,24 @@ runs:
           echo "[*] susfs-patches directory not found, skipping KSU module patches"
           echo "[*] GKI kernel patches should be applied by AndroidGKI workflow"
         fi
+
+    - name: Upload debug log on failure
+      if: failure()
+      shell: bash
+      run: |
+        if [ -f /tmp/root-setup-debug.log ]; then
+          echo "=== Uploading debug log ==="
+          cat /tmp/root-setup-debug.log
+          echo ""
+          # Upload as artifact
+          mkdir -p debug-logs
+          cp /tmp/root-setup-debug.log debug-logs/root-setup-debug.log
+        fi
+
+    - name: Upload artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: root-setup-debug-logs
+        path: debug-logs/
+        retention-days: 1
