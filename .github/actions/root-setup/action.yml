@@ -180,8 +180,8 @@ runs:
           # For Kbuild-based trees, the driver Makefile needs to include
           # the kernel's own Kbuild rather than listing objects.
           # The kernel/Kbuild already handles obj-$(CONFIG_KSU) correctly.
-          grep -q "include \"$relative_kernel/Kbuild\"" "$drivers_dir/Makefile" ||
-            printf "\ninclude \"$relative_kernel/Kbuild\"\n" >> "$drivers_dir/Makefile"
+          grep -q "include $relative_kernel/Kbuild" "$drivers_dir/Makefile" ||
+            printf "\ninclude $relative_kernel/Kbuild\n" >> "$drivers_dir/Makefile"
           grep -q 'source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig" ||
             sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig"
         else
