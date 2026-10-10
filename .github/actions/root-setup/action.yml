@@ -200,7 +200,10 @@ runs:
 
         echo "ROOT_IMPLEMENTATION=$flavor" >> "$GITHUB_ENV"
         echo "ROOT_MANAGER=$manager" >> "$GITHUB_ENV"
-        echo "ROOT_VERSION=$root_version" >> "$GITHUB_ENV"
+        # root_version only defined for builtin (unity build) style
+        if [ -n "${root_version:-}" ]; then
+          echo "ROOT_VERSION=$root_version" >> "$GITHUB_ENV"
+        fi
         echo "ROOT_COMMIT=$actual_commit" >> "$GITHUB_ENV"
 
     - name: Enable root configuration
