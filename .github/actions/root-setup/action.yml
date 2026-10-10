@@ -53,6 +53,7 @@ runs:
         } | tee /tmp/root-setup-debug.log
 
         echo "=== Entering case statement ===" >&2
+        echo "[$(date -u +%H:%M:%S)] About to execute case statement..." >&2
         case "$flavor" in
           kernelsu)
             repo="https://github.com/tiann/KernelSU.git"
@@ -84,12 +85,16 @@ runs:
             repo="https://github.com/KairoVera/SukiSU-Ultra.git"
             directory="SukiSU-Ultra-Custom"
             manager="SukiSU-Ultra-Custom Manager"
+            echo "[$(date -u +%H:%M:%S)] Matched sukisu-ultra-custom case" >&2
             ;;
           *)
             echo "Unsupported root flavor: $flavor" >&2
             exit 2
             ;;
         esac
+        echo "[$(date -u +%H:%M:%S)] Case statement completed" >&2
+        echo "repo=$repo" >&2
+        echo "directory=$directory" >&2
 
         if ! [[ "$expected_commit" =~ ^[0-9a-f]{40}$ ]]; then
           echo "Root commit must be a full 40-character SHA." >&2
