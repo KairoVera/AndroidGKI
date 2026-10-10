@@ -52,6 +52,7 @@ runs:
           echo "About to enter case statement..."
         } | tee /tmp/root-setup-debug.log
 
+        echo "=== Entering case statement ===" >&2
         case "$flavor" in
           kernelsu)
             repo="https://github.com/tiann/KernelSU.git"
