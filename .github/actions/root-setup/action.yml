@@ -123,6 +123,7 @@ runs:
         echo "directory=$directory"
         echo "expected_commit=$expected_commit"
         echo "PWD=$PWD"
+        echo "[$(date -u +%H:%M:%S)] Debug info written, about to check directories..."
         echo ""
         echo "=== Checking for existing directory ==="
         if [ -d "$directory" ]; then
@@ -130,6 +131,7 @@ runs:
           rm -rf "$directory"
         fi
         echo "=== Attempting git clone ==="
+        echo "[$(date -u +%H:%M:%S)] Executing: git clone --no-checkout \"$repo\" \"$directory\""
         git clone --no-checkout "$repo" "$directory" 2>&1
         echo "[*] Clone exit code: $?"
         
