@@ -170,6 +170,13 @@ runs:
         # custom-main uses standard Kbuild (multiple source files), while builtin
         # uses unity build (single ksu.c). Detect the variant and configure accordingly.
         relative_kernel="$(realpath --relative-to="$drivers_dir" "$PWD/$directory/kernel")"
+        echo "[*] DEBUG: drivers_dir=$drivers_dir"
+        echo "[*] DEBUG: PWD=$PWD"
+        echo "[*] DEBUG: directory=$directory"
+        echo "[*] DEBUG: relative_kernel=$relative_kernel"
+        echo "[*] DEBUG: target path=$PWD/$directory/kernel/Kbuild"
+        ls -la "$PWD/$directory/" 2>/dev/null || echo "[!] Directory $directory does not exist!"
+        ls -la "$PWD/$directory/kernel/" 2>/dev/null || echo "[!] Directory $directory/kernel does not exist!"
         if [ -f "$directory/kernel/Kbuild" ]; then
           # custom-main style: standard Kbuild with multiple source files
           echo "[*] Detected standard Kbuild layout (custom-main style)"
