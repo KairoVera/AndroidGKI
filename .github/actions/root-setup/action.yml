@@ -124,6 +124,8 @@ runs:
         echo "expected_commit=$expected_commit"
         echo "PWD=$PWD"
         echo "[$(date -u +%H:%M:%S)] Debug info written, about to check directories..."
+        echo "[$(date -u +%H:%M:%S)] repo=$repo" >&2
+        echo "[$(date -u +%H:%M:%S)] directory=$directory" >&2
         echo ""
         echo "=== Checking for existing directory ==="
         if [ -d "$directory" ]; then
