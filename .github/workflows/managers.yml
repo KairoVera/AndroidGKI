@@ -281,7 +281,8 @@ jobs:
                     exit 1
                   fi
                 else
-                  stock=$(resolve_sha https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main)
+                  # 使用 builtin 分支作为 manager stock (包含 arch.h 修复 + fake_state)
+                  stock=$(git ls-remote https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/builtin | awk '{print $1; exit}')
                 fi
                 run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
                   --jq '.workflow_runs[0].id // empty')
@@ -486,7 +487,7 @@ jobs:
             ref: main
           - flavor: sukisu-ultra
             repo: https://github.com/SukiSU-Ultra/SukiSU-Ultra.git
-            ref: main
+            ref: builtin
           - flavor: kowsu
             repo: https://github.com/KOWX712/KernelSU.git
             ref: master
@@ -668,7 +669,7 @@ jobs:
             ref: main
           - flavor: sukisu-ultra
             repo: https://github.com/SukiSU-Ultra/SukiSU-Ultra.git
-            ref: main
+            ref: builtin
           - flavor: kowsu
             repo: https://github.com/KOWX712/KernelSU.git
             ref: master

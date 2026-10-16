@@ -345,7 +345,8 @@ jobs:
           if [ "$SCHED_SUSFS" = "true" ]; then
             KERNELSU_COMMIT="$(pick "$PIN_KERNELSU" https://github.com/tiann/KernelSU.git refs/heads/main)"
             BAKASU_COMMIT="$(pick "$PIN_BAKASU" https://github.com/Baka-SU/BakaSU.git refs/heads/main)"
-            SUKISU_ULTRA_COMMIT="$(pick "$PIN_SUKISU_ULTRA" https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/builtin)"
+            # 使用 main 分支 + 外部 SUSFS 补丁 (SukiSU-Ultra/main 不含 SUSFS 内核代码)
+            SUKISU_ULTRA_COMMIT="$(resolve_sha https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main)"
           else
             KERNELSU_COMMIT="$(resolve_sha https://github.com/tiann/KernelSU.git refs/heads/main)"
             BAKASU_COMMIT="$(resolve_sha https://github.com/Baka-SU/BakaSU.git refs/heads/main)"
@@ -528,17 +529,18 @@ jobs:
                 ;;
               sukisu-ultra)
                 owner="SukiSU-Ultra"; repo="SukiSU-Ultra"; wf="build-manager.yml"
-                stock=$(git ls-remote https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main | awk '{print $1; exit}')
+                # 使用 builtin 分支作为 manager stock (包含 arch.h 修复 + fake_state)
+                stock=$(git ls-remote https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/builtin | awk '{print $1; exit}')
                 run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
                   --jq '.workflow_runs[0].id // empty')
                 if [[ -z "${run_id}" ]]; then
-                  echo "No manager build for stock ${stock}, falling back to latest successful run" >&2
-                  fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=main&status=success&per_page=1")
+                  echo "No manager build for builtin stock ${stock}, falling back to latest successful run" >&2
+                  fb=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?branch=builtin&status=success&per_page=1")
                   run_id=$(echo "$fb" | jq -r '.workflow_runs[0].id // empty')
                   stock=$(echo "$fb" | jq -r '.workflow_runs[0].head_sha // empty')
                   if [[ -n "$run_id" ]]; then echo "Fallback to ${stock} run ${run_id}" >&2; fi
                   if [[ -z "${run_id}" ]]; then
-                    echo "ERROR: no ${repo} manager build exists for stock commit ${stock}" >&2
+                    echo "ERROR: no ${repo} manager build exists for builtin commit ${stock}" >&2
                     exit 1
                   fi
                 fi
