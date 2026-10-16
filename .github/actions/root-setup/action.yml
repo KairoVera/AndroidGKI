@@ -82,28 +82,25 @@ runs:
           echo "Refusing to replace an existing kernelsu integration." >&2
           exit 1
         fi
-        if [ -e "$directory" ]; then
-          echo "Refusing to reuse an existing root checkout: $directory." >&2
-          exit 1
-        fi
-
         # Use setup.sh for SukiSU-Ultra when requested
         if [ "$flavor" = "sukisu-ultra" ] && [ "$use_setup_sh" = "true" ]; then
-          echo "[+] Using setup.sh for SukiSU-Ultra integration..."
-          # Download and modify setup.sh to use correct directory name
-          setup_sh=$(curl -sL "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh")
-          # Replace KernelSU directory name with SukiSU-Ultra
-          setup_sh=$(echo "$setup_sh" | sed 's|KernelSU|SukiSU-Ultra|g')
-          # Save to temp file
-          echo "$setup_sh" > /tmp/setup_sukisu.sh
-          chmod +x /tmp/setup_sukisu.sh
-          # Run setup.sh with the expected commit
-          cd "$GITHUB_WORKSPACE"
-          bash /tmp/setup_sukisu.sh "$expected_commit"
-          # Update directory name for later steps
-          directory="SukiSU-Ultra"
-          # setup.sh already handles symlink and Makefile/Kconfig, skip below
-          use_setup_sh=true
+          if [ ! -e "$directory" ]; then
+            echo "[+] Using setup.sh for SukiSU-Ultra integration..."
+            # Download and modify setup.sh to use correct directory name
+            setup_sh=$(curl -sL "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh")
+            # Replace KernelSU directory name with SukiSU-Ultra
+            setup_sh=$(echo "$setup_sh" | sed 's|KernelSU|SukiSU-Ultra|g')
+            # Save to temp file
+            echo "$setup_sh" > /tmp/setup_sukisu.sh
+            chmod +x /tmp/setup_sukisu.sh
+            # Run setup.sh with the expected commit
+            cd "$GITHUB_WORKSPACE"
+            bash /tmp/setup_sukisu.sh "$expected_commit"
+          else
+            echo "[-] Directory $directory already exists, skipping setup.sh."
+          fi
+        elif [ -e "$directory" ]; then
+          echo "[-] Directory $directory already exists, skipping clone."
         else
           echo "[+] Cloning $repo to $directory..."
           git clone --no-checkout "$repo" "$directory"
