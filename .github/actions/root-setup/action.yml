@@ -102,6 +102,8 @@ runs:
           bash /tmp/setup_sukisu.sh "$expected_commit"
           # Update directory name for later steps
           directory="SukiSU-Ultra"
+          # setup.sh already handles symlink and Makefile/Kconfig, skip below
+          use_setup_sh=true
         else
           echo "[+] Cloning $repo to $directory..."
           git clone --no-checkout "$repo" "$directory"
@@ -120,13 +122,15 @@ runs:
         fi
         root_version="$(git -C "$directory" describe --tags --always --dirty)"
 
-        # Create symlink and modify Makefile/Kconfig
-        relative_kernel="$(realpath --relative-to="$drivers_dir" "$PWD/$directory/kernel")"
-        ln -s "$relative_kernel" "$drivers_dir/kernelsu"
-        grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$drivers_dir/Makefile" || \
-          printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> "$drivers_dir/Makefile"
-        grep -q 'source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig" || \
-          sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig"
+        # Create symlink and modify Makefile/Kconfig (skip if setup.sh already did it)
+        if [ "$use_setup_sh" != "true" ]; then
+          relative_kernel="$(realpath --relative-to="$drivers_dir" "$PWD/$directory/kernel")"
+          ln -s "$relative_kernel" "$drivers_dir/kernelsu"
+          grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$drivers_dir/Makefile" || \
+            printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> "$drivers_dir/Makefile"
+          grep -q 'source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig" || \
+            sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig"
+        fi
 
         echo "ROOT_IMPLEMENTATION=$flavor" >> "$GITHUB_ENV"
         echo "ROOT_MANAGER=$manager" >> "$GITHUB_ENV"
