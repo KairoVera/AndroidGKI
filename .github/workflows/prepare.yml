@@ -91,6 +91,11 @@ on:
         required: false
         type: string
         default: "4k"
+      use_setup_sh:
+        description: "Use setup.sh script for SukiSU-Ultra integration"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   generate-matrix:
@@ -347,5 +352,6 @@ jobs:
       allow_version_mismatch: ${{ inputs.allow_version_mismatch }}
       use_cache: ${{ inputs.use_cache }}
       page_size: ${{ inputs.page_size }}
-      stock_config_artifact: stock-configs-${{ needs.generate-matrix.outputs.version_slug }}
+      stock_config_artifact: ${{ inputs.stock_config_artifact }}
+      use_setup_sh: ${{ inputs.use_setup_sh }}
     secrets: inherit

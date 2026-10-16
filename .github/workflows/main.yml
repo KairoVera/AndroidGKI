@@ -885,6 +885,7 @@ jobs:
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
       page_size: ${{ inputs.page_size || '4k' }}
+      use_setup_sh: ${{ matrix.root.root_flavor == 'sukisu-ultra' && true || false }}
     secrets: inherit
 
   build-android13-5-10:
@@ -916,6 +917,7 @@ jobs:
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
       page_size: ${{ inputs.page_size || '4k' }}
+      use_setup_sh: ${{ matrix.root.root_flavor == 'sukisu-ultra' && true || false }}
     secrets: inherit
 
   build-android13-5-15:
@@ -947,6 +949,7 @@ jobs:
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
       page_size: ${{ inputs.page_size || '4k' }}
+      use_setup_sh: ${{ matrix.root.root_flavor == 'sukisu-ultra' && true || false }}
     secrets: inherit
 
   build-android14-5-15:
@@ -978,6 +981,7 @@ jobs:
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
       page_size: ${{ inputs.page_size || '4k' }}
+      use_setup_sh: ${{ matrix.root.root_flavor == 'sukisu-ultra' && true || false }}
     secrets: inherit
 
   build-android14-6-1:
@@ -1009,6 +1013,7 @@ jobs:
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
       page_size: ${{ inputs.page_size || '4k' }}
+      use_setup_sh: ${{ matrix.root.root_flavor == 'sukisu-ultra' && true || false }}
     secrets: inherit
 
   build-android15-6-6:
@@ -1040,6 +1045,7 @@ jobs:
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
       page_size: ${{ inputs.page_size || '4k' }}
+      use_setup_sh: ${{ matrix.root.root_flavor == 'sukisu-ultra' && true || false }}
     secrets: inherit
 
   build-android16-6-12:
@@ -1071,6 +1077,7 @@ jobs:
       allow_version_mismatch: ${{ inputs.allow_version_mismatch || false }}
       use_cache: ${{ inputs.use_cache || (github.event_name == 'schedule' && true) || false }}
       page_size: ${{ inputs.page_size || '4k' }}
+      use_setup_sh: ${{ matrix.root.root_flavor == 'sukisu-ultra' && true || false }}
     secrets: inherit
 
   telegram-announce:

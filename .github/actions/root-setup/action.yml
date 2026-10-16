@@ -7,6 +7,11 @@ inputs:
   commit:
     description: 'Full immutable commit SHA'
     required: true
+  use_setup_sh:
+    description: 'Use setup.sh script for SukiSU-Ultra integration'
+    required: false
+    type: boolean
+    default: false
 
 runs:
   using: composite
@@ -19,6 +24,7 @@ runs:
 
         flavor="${{ inputs.flavor }}"
         expected_commit="${{ inputs.commit }}"
+        use_setup_sh="${{ inputs.use_setup_sh }}"
         case "$flavor" in
           kernelsu)
             repo="https://github.com/tiann/KernelSU.git"
@@ -81,9 +87,28 @@ runs:
           exit 1
         fi
 
-        git clone --no-checkout "$repo" "$directory"
-        git -C "$directory" fetch --depth=1 origin "$expected_commit"
-        git -C "$directory" checkout --detach "$expected_commit"
+        # Use setup.sh for SukiSU-Ultra when requested
+        if [ "$flavor" = "sukisu-ultra" ] && [ "$use_setup_sh" = "true" ]; then
+          echo "[+] Using setup.sh for SukiSU-Ultra integration..."
+          # Download and modify setup.sh to use correct directory name
+          setup_sh=$(curl -sL "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh")
+          # Replace KernelSU directory name with SukiSU-Ultra
+          setup_sh=$(echo "$setup_sh" | sed 's|KernelSU|SukiSU-Ultra|g')
+          # Save to temp file
+          echo "$setup_sh" > /tmp/setup_sukisu.sh
+          chmod +x /tmp/setup_sukisu.sh
+          # Run setup.sh with the expected commit
+          cd "$GITHUB_WORKSPACE"
+          bash /tmp/setup_sukisu.sh "$expected_commit"
+          # Update directory name for later steps
+          directory="SukiSU-Ultra"
+        else
+          echo "[+] Cloning $repo to $directory..."
+          git clone --no-checkout "$repo" "$directory"
+          git -C "$directory" fetch --depth=1 origin "$expected_commit"
+          git -C "$directory" checkout --detach "$expected_commit"
+        fi
+
         actual_commit="$(git -C "$directory" rev-parse HEAD)"
         if [ "$actual_commit" != "$expected_commit" ]; then
           echo "Root commit mismatch: expected $expected_commit, got $actual_commit." >&2
@@ -95,11 +120,12 @@ runs:
         fi
         root_version="$(git -C "$directory" describe --tags --always --dirty)"
 
+        # Create symlink and modify Makefile/Kconfig
         relative_kernel="$(realpath --relative-to="$drivers_dir" "$PWD/$directory/kernel")"
         ln -s "$relative_kernel" "$drivers_dir/kernelsu"
-        grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$drivers_dir/Makefile" ||
+        grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$drivers_dir/Makefile" || \
           printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> "$drivers_dir/Makefile"
-        grep -q 'source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig" ||
+        grep -q 'source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig" || \
           sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig"
 
         echo "ROOT_IMPLEMENTATION=$flavor" >> "$GITHUB_ENV"
