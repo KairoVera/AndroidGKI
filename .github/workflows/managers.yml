@@ -281,7 +281,8 @@ jobs:
                     exit 1
                   fi
                 else
-                  stock=$(resolve_sha https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/builtin)
+                  # Manager: use main branch (CI runs on main/dev/ci, not builtin)
+                  stock=$(resolve_sha https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main)
                 fi
                 run_id=$(gh api "repos/${owner}/${repo}/actions/workflows/${wf}/runs?head_sha=${stock}" \
                   --jq '.workflow_runs[0].id // empty')
