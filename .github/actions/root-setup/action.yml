@@ -74,7 +74,8 @@ runs:
         elif [ -d drivers ]; then
           drivers_dir="drivers"
         else
-          echo "Kernel drivers directory not found." >&2
+          echo "ERROR: Kernel drivers directory not found. Expected 'common/drivers' or 'drivers' to exist." >&2
+          echo "  Please ensure the kernel has been downloaded before running root-setup." >&2
           exit 1
         fi
 
@@ -94,7 +95,9 @@ runs:
           git -C "$directory" fetch --depth=1 origin "$expected_commit"
           git -C "$directory" checkout --detach "$expected_commit"
           # Create symlink with absolute paths relative to workspace root
-          abs_drivers="$GITHUB_WORKSPACE/$drivers_dir"
+          # Note: $drivers_dir is relative to kernel/ (action's working dir),
+          # so we need to prepend $GITHUB_WORKSPACE/kernel/ for absolute paths.
+          abs_drivers="$GITHUB_WORKSPACE/kernel/$drivers_dir"
           abs_kernel="$PWD/$directory/kernel"
           ln -sf "$abs_kernel" "$abs_drivers/kernelsu"
           grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$abs_drivers/Makefile" || \
