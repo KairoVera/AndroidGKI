@@ -93,14 +93,14 @@ runs:
           git clone --no-checkout "$repo" "$directory"
           git -C "$directory" fetch --depth=1 origin "$expected_commit"
           git -C "$directory" checkout --detach "$expected_commit"
-          # Create symlink with absolute path (avoids realpath dependency on missing dir)
-          cd "$GITHUB_WORKSPACE"
+          # Create symlink with absolute paths relative to workspace root
+          abs_drivers="$GITHUB_WORKSPACE/$drivers_dir"
           abs_kernel="$PWD/$directory/kernel"
-          ln -sf "$abs_kernel" "$drivers_dir/kernelsu"
-          grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$drivers_dir/Makefile" || \
-            printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> "$drivers_dir/Makefile"
-          grep -q 'source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig" || \
-            sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig"
+          ln -sf "$abs_kernel" "$abs_drivers/kernelsu"
+          grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$abs_drivers/Makefile" || \
+            printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> "$abs_drivers/Makefile"
+          grep -q 'source "drivers/kernelsu/Kconfig"' "$abs_drivers/Kconfig" || \
+            sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' "$abs_drivers/Kconfig"
         fi
 
         actual_commit="$(git -C "$directory" rev-parse HEAD)"
