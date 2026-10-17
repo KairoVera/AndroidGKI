@@ -109,9 +109,7 @@ runs:
             setup_sh_url="https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh"
             curl -fsSL --retry 3 --retry-delay 5 "$setup_sh_url" -o /tmp/setup_sukisu.sh
             chmod +x /tmp/setup_sukisu.sh
-            cd "$GITHUB_WORKSPACE/kernel"
-            bash /tmp/setup_sukisu.sh "$expected_commit"
-            cd -
+            (cd "$GITHUB_WORKSPACE/kernel" && bash /tmp/setup_sukisu.sh "$expected_commit")
           else
             # Fallback: manual setup (same as setup.sh does)
             echo "[+] Cloning SukiSU-Ultra to $directory..."
