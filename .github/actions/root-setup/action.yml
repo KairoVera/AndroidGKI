@@ -83,8 +83,12 @@ runs:
           exit 1
         fi
         if [ -e "$directory" ]; then
-          echo "Refusing to reuse an existing root checkout: $directory." >&2
-          exit 1
+          if [ "$flavor" = "sukisu-ultra" ] && [ "$use_setup_sh" = "true" ]; then
+            echo "[-] Directory $directory already exists, skipping setup.sh."
+          else
+            echo "Refusing to reuse an existing root checkout: $directory." >&2
+            exit 1
+          fi
         fi
 
         # Use setup.sh for SukiSU-Ultra when requested
