@@ -85,14 +85,15 @@ runs:
         if [ -e "$directory" ]; then
           if [ "$flavor" = "sukisu-ultra" ] && [ "$use_setup_sh" = "true" ]; then
             echo "[-] Directory $directory already exists, skipping setup.sh."
+            setup_sh_done=true
           else
             echo "Refusing to reuse an existing root checkout: $directory." >&2
             exit 1
           fi
         fi
 
-        # Use setup.sh for SukiSU-Ultra when requested
-        if [ "$flavor" = "sukisu-ultra" ] && [ "$use_setup_sh" = "true" ]; then
+        # Use setup.sh for SukiSU-Ultra when requested (only if directory doesn't exist yet)
+        if [ "$flavor" = "sukisu-ultra" ] && [ "$use_setup_sh" = "true" ] && [ "$setup_sh_done" != "true" ]; then
           echo "[+] Using setup.sh for SukiSU-Ultra integration..."
           # Download and modify setup.sh to use correct directory name
           setup_sh=$(curl -sL "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh")
@@ -106,7 +107,7 @@ runs:
           bash /tmp/setup_sukisu.sh "$expected_commit"
           # Update directory name for later steps
           directory="SukiSU-Ultra"
-        else
+        elif [ "$setup_sh_done" != "true" ]; then
           echo "[+] Cloning $repo to $directory..."
           git clone --no-checkout "$repo" "$directory"
           git -C "$directory" fetch --depth=1 origin "$expected_commit"
