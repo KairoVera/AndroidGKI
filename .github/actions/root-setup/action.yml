@@ -96,16 +96,28 @@ runs:
             # Run setup.sh with the expected commit
             cd "$GITHUB_WORKSPACE"
             bash /tmp/setup_sukisu.sh "$expected_commit"
+            # Verify commit
+            actual_commit="$(git -C "$directory" rev-parse HEAD)"
+            if [ "$actual_commit" != "$expected_commit" ]; then
+              echo "Root commit mismatch after setup.sh: expected $expected_commit, got $actual_commit." >&2
+              exit 1
+            fi
           else
             echo "[-] Directory $directory already exists, skipping setup.sh."
           fi
-        elif [ -e "$directory" ]; then
-          echo "[-] Directory $directory already exists, skipping clone."
-        else
-          echo "[+] Cloning $repo to $directory..."
-          git clone --no-checkout "$repo" "$directory"
-          git -C "$directory" fetch --depth=1 origin "$expected_commit"
-          git -C "$directory" checkout --detach "$expected_commit"
+          # Skip normal clone and symlink steps below
+          use_setup_sh=true
+        fi
+
+        if [ "$use_setup_sh" != "true" ]; then
+          if [ -e "$directory" ]; then
+            echo "[-] Directory $directory already exists, skipping clone."
+          else
+            echo "[+] Cloning $repo to $directory..."
+            git clone --no-checkout "$repo" "$directory"
+            git -C "$directory" fetch --depth=1 origin "$expected_commit"
+            git -C "$directory" checkout --detach "$expected_commit"
+          fi
         fi
 
         actual_commit="$(git -C "$directory" rev-parse HEAD)"
