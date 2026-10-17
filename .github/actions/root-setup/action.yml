@@ -126,16 +126,22 @@ runs:
           fi
         fi
 
-        actual_commit="$(git -C "$directory" rev-parse HEAD)"
+        # When using setup.sh, the actual directory is KernelSU, not $directory
+        actual_dir="$directory"
+        if [ "$use_setup_sh" = "true" ] && [ -d "$GITHUB_WORKSPACE/kernel/KernelSU" ]; then
+          actual_dir="KernelSU"
+        fi
+
+        actual_commit="$(git -C "$actual_dir" rev-parse HEAD)"
         if [ "$actual_commit" != "$expected_commit" ]; then
           echo "Root commit mismatch: expected $expected_commit, got $actual_commit." >&2
           exit 1
         fi
-        if [ ! -f "$directory/kernel/Kconfig" ] || [ ! -f "$directory/kernel/Makefile" ]; then
+        if [ ! -f "$actual_dir/kernel/Kconfig" ] || [ ! -f "$actual_dir/kernel/Makefile" ]; then
           echo "Selected root checkout does not contain a kernel integration." >&2
           exit 1
         fi
-        root_version="$(git -C "$directory" describe --tags --always --dirty)"
+        root_version="$(git -C "$actual_dir" describe --tags --always --dirty)"
 
         echo "ROOT_IMPLEMENTATION=$flavor" >> "$GITHUB_ENV"
         echo "ROOT_MANAGER=$manager" >> "$GITHUB_ENV"
