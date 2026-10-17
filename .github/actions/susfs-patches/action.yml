@@ -14,15 +14,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Apply Kernel SUSFS Patches
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/common
-      run: |
-        # Apply base SUSFS patches
-        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/fs/"* "${{ github.workspace }}/kernel/common/fs/"
-        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
-        cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.version }}.patch ./
-
     - name: Apply Android 12 5.10 Fake Patches
       shell: bash
       if: inputs.version == 'android12-5.10'
@@ -111,7 +102,7 @@ runs:
         echo "Applying 6.6 SUSFS fixes"
         if [ "${{ inputs.sublevel }}" -le "30" ]; then
           echo "Applying taskmmu.c Android 15 6.6 Fake Patch"
-          python3 -c 'import re;c=open("fs/proc/task_mmu.c").read();c=re.sub(r"(\t+\t\tif\s*\(\s*vma->vm_end\s*>\s*last_vma_end\s*\))\n(\t+\t\t\tsmap_gather_stats\(vma,\s*&mss,\s*last_vma_end\);)\n(\t+)\}",lambda m:m.group(1)+" {\n"+m.group(2)+"\n"+m.group(3)+"\t\tlast_vma_end = vma->vm_end;\n"+m.group(3)+"\t}\n"+m.group(3)+"}",c,count=1);open("fs/proc/task_mmu.c","w").write(c)'
+          python3 -c 'import re;c=open("fs/proc/task_mmu.c").read();c=re.sub(r"(\t+\t\tif\s*\(s*vma->vm_end\s*>\s*last_vma_end\s*\))\n(\t+\t\t\tsmap_gather_stats\(vma,\s*&mss,\s*last_vma_end;\))\n(\t+)\}",lambda m:m.group(1)+" {\n"+m.group(2)+"\n"+m.group(3)+"\t\tlast_vma_end = vma->vm_end;\n"+m.group(3)+"\t}\n"+m.group(3)+"}",c,count=1);open("fs/proc/task_mmu.c","w").write(c)'
         fi
         if [ "${{ inputs.sublevel }}" -le "30" ] && [ "${{ inputs.os_patch_level }}" = "2024-07" ]; then
           echo "Adding __fold_filemap_fixup_entry stub for 2024-07 kernels"
@@ -156,7 +147,21 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
+        # Apply base SUSFS patches
+        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/fs/"* "${{ github.workspace }}/kernel/common/fs/"
+        cp "${{ github.workspace }}/susfs4ksu/kernel_patches/include/linux/"* "${{ github.workspace }}/kernel/common/include/linux/"
+        cp ${{ github.workspace }}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.version }}.patch ./
+        
         patch -p1 < 50_add_susfs_in_gki-${{ inputs.version }}.patch
+        
+        # Fallback: ensure obj-$(CONFIG_KSU_SUSFS) += susfs.o is in fs/Makefile
+        # The SUSFS patch may fail silently if the Makefile format doesn't match exactly
+        if ! grep -q 'obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile; then
+          echo "WARNING: SUSFS Makefile patch failed, adding manually"
+          # Add the line after the obj-y line that ends with remap_range.o
+          sed -i '/^obj-y :=.*kernel_read_file.o remap_range.o$/a obj-$(CONFIG_KSU_SUSFS) += susfs.o' fs/Makefile
+          echo "Added CONFIG_KSU_SUSFS rule to fs/Makefile"
+        fi
 
         # SUSFS's OPEN_REDIRECT code unconditionally calls VMA_PAD_START(), which
         # only exists on GKI branches that carry Google's page-size-migration
