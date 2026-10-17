@@ -83,30 +83,31 @@ runs:
           exit 1
         fi
         if [ -e "$directory" ]; then
-          echo "Refusing to reuse an existing root checkout: $directory." >&2
-          exit 1
+          if [ "$flavor" = "sukisu-ultra" ] && [ "$use_setup_sh" = "true" ]; then
+            echo "[-] Directory $directory already exists (retry or cached), skipping setup."
+            directory_verified=true
+          else
+            echo "Refusing to reuse an existing root checkout: $directory." >&2
+            exit 1
+          fi
         fi
 
         # Use setup.sh for SukiSU-Ultra when requested
-        if [ "$flavor" = "sukisu-ultra" ] && [ "$use_setup_sh" = "true" ]; then
-          if [ ! -e "$directory" ]; then
-            echo "[+] Using setup.sh for SukiSU-Ultra integration..."
-            # Download and modify setup.sh to use correct directory name
-            setup_sh=$(curl -sL "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh")
-            # Replace KernelSU directory name with SukiSU-Ultra
-            setup_sh=$(echo "$setup_sh" | sed 's|KernelSU|SukiSU-Ultra|g')
-            # Save to temp file
-            echo "$setup_sh" > /tmp/setup_sukisu.sh
-            chmod +x /tmp/setup_sukisu.sh
-            # Run setup.sh with the expected commit
-            cd "$GITHUB_WORKSPACE"
-            bash /tmp/setup_sukisu.sh "$expected_commit"
-            # Update directory name for later steps
-            directory="SukiSU-Ultra"
-          else
-            echo "[-] Directory $directory already exists (retry or cached), skipping setup.sh."
-          fi
-        else
+        if [ "$flavor" = "sukisu-ultra" ] && [ "$use_setup_sh" = "true" ] && [ "$directory_verified" != "true" ]; then
+          echo "[+] Using setup.sh for SukiSU-Ultra integration..."
+          # Download and modify setup.sh to use correct directory name
+          setup_sh=$(curl -sL "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh")
+          # Replace KernelSU directory name with SukiSU-Ultra
+          setup_sh=$(echo "$setup_sh" | sed 's|KernelSU|SukiSU-Ultra|g')
+          # Save to temp file
+          echo "$setup_sh" > /tmp/setup_sukisu.sh
+          chmod +x /tmp/setup_sukisu.sh
+          # Run setup.sh with the expected commit
+          cd "$GITHUB_WORKSPACE"
+          bash /tmp/setup_sukisu.sh "$expected_commit"
+          # Update directory name for later steps
+          directory="SukiSU-Ultra"
+        elif [ "$directory_verified" != "true" ]; then
           echo "[+] Cloning $repo to $directory..."
           git clone --no-checkout "$repo" "$directory"
           git -C "$directory" fetch --depth=1 origin "$expected_commit"
