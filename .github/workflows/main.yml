@@ -263,9 +263,9 @@ jobs:
           # worth the root_matrix plumbing for 3 selinux_hide commits. Flip to
           # latest when BakaSU upstream restores the contract.
           PIN_BAKASU="9097b1a1c6c889756201bbc5713a84a9b23f7908"
-          # SukiSU-Ultra: builtin tip (2026-10-09, adds missing arch.h);
+          # SukiSU-Ultra: builtin tip (2026-10-17, fixes __user annotation in supercall.h);
           # defines fake_state itself, calls the susfs_def.h no_su API -> OK on tips.
-          PIN_SUKISU_ULTRA="6c284e957feaa9a388a9f1c37dc4ec80d95e434b"
+          PIN_SUKISU_ULTRA="f6731caa927382e9ee864a4163aee68a808f0e69"
           declare -A PIN_SUSFS=(
             [susfs_commit_android12_5_10]="82f08351fadb8b19dd6591bd14634d02ad832145"
             [susfs_commit_android13_5_10]="14c45388ec8cb3ca72f2ac8bf83097b9285a8418"
