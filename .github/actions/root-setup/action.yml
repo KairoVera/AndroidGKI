@@ -78,9 +78,13 @@ runs:
           exit 1
         fi
 
-        if [ -e "$drivers_dir/kernelsu" ] || [ -L "$drivers_dir/kernelsu" ]; then
-          echo "Refusing to replace an existing kernelsu integration." >&2
-          exit 1
+        # Clean up stale symlink if it points to wrong location or is broken
+        if [ -L "$drivers_dir/kernelsu" ]; then
+          link_target=$(readlink "$drivers_dir/kernelsu")
+          if [ ! -d "$drivers_dir/kernelsu/kernel" ]; then
+            echo "[-] Removing stale kernelsu symlink" >&2
+            rm "$drivers_dir/kernelsu"
+          fi
         fi
         if [ -e "$directory" ]; then
           echo "[-] Directory $directory already exists (retry or cached), skipping setup."
