@@ -93,10 +93,10 @@ runs:
           git clone --no-checkout "$repo" "$directory"
           git -C "$directory" fetch --depth=1 origin "$expected_commit"
           git -C "$directory" checkout --detach "$expected_commit"
-          # Manually apply what setup.sh does: create symlink and modify Makefile/Kconfig
+          # Create symlink with absolute path (avoids realpath dependency on missing dir)
           cd "$GITHUB_WORKSPACE"
-          relative_kernel="$(realpath --relative-to="$drivers_dir" "$PWD/$directory/kernel")"
-          ln -s "$relative_kernel" "$drivers_dir/kernelsu"
+          abs_kernel="$PWD/$directory/kernel"
+          ln -sf "$abs_kernel" "$drivers_dir/kernelsu"
           grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$drivers_dir/Makefile" || \
             printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> "$drivers_dir/Makefile"
           grep -q 'source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig" || \
