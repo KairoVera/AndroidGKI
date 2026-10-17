@@ -89,14 +89,22 @@ runs:
         fi
         if [ -e "$directory" ]; then
           echo "[-] Directory $directory already exists (retry or cached), skipping setup."
-        else
-          echo "[+] Cloning SukiSU-Ultra to $directory..."
-          git clone --no-checkout "$repo" "$directory"
-          git -C "$directory" fetch --depth=1 origin "$expected_commit"
-          git -C "$directory" checkout --detach "$expected_commit"
-          
-          # If use_setup_sh is enabled, run the official setup.sh script
+          # When using setup.sh, we still need to create the symlink and modify Makefile/Kconfig
           if [ "$use_setup_sh" = "true" ]; then
+            # setup.sh creates its own KernelSU dir, check if symlink exists
+            if [ ! -L "$drivers_dir/kernelsu" ]; then
+              abs_kernel="$GITHUB_WORKSPACE/kernel/KernelSU/kernel"
+              ln -sf "$abs_kernel" "$drivers_dir/kernelsu"
+              grep -q 'obj-$(CONFIG_KSU) += kernelsu/' "$drivers_dir/Makefile" || \
+                printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> "$drivers_dir/Makefile"
+              grep -q 'source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig" || \
+                sed -i '/endmenu/i source "drivers/kernelsu/Kconfig"' "$drivers_dir/Kconfig"
+              echo "[+] Created symlink and modified Makefile/Kconfig for existing directory"
+            fi
+          fi
+        else
+          if [ "$use_setup_sh" = "true" ]; then
+            # Let setup.sh handle everything - it will clone to KernelSU dir
             echo "[+] Running official setup.sh script..."
             setup_sh_url="https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh"
             curl -fsSL --retry 3 --retry-delay 5 "$setup_sh_url" -o /tmp/setup_sukisu.sh
@@ -106,6 +114,10 @@ runs:
             cd -
           else
             # Fallback: manual setup (same as setup.sh does)
+            echo "[+] Cloning SukiSU-Ultra to $directory..."
+            git clone --no-checkout "$repo" "$directory"
+            git -C "$directory" fetch --depth=1 origin "$expected_commit"
+            git -C "$directory" checkout --detach "$expected_commit"
             abs_drivers="$GITHUB_WORKSPACE/kernel/$drivers_dir"
             abs_kernel="$PWD/$directory/kernel"
             ln -sf "$abs_kernel" "$abs_drivers/kernelsu"
