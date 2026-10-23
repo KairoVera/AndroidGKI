@@ -18,22 +18,38 @@ runs:
       run: |
         set -euo pipefail
         PATCHDIR="${GITHUB_WORKSPACE}/.github/actions/mount-hide/patches"
+        # Apply a patch only if it actually applies at the checked-out SukiSU
+        # commit; otherwise skip it safely (each fix targets a specific pin's
+        # source layout and must not break builds on other pins).
+        apply() {
+          local label="$1" patchfile="$2"
+          if patch -p1 --forward --dry-run < "$patchfile" >/dev/null 2>&1; then
+            echo "[*] Applying ${label}"
+            patch -p1 --forward < "$patchfile"
+          else
+            echo "[*] ${label} not applicable at this SukiSU commit; skipping (safe)."
+          fi
+        }
         # 1) mount_hide: scope open-refusal to isolated uids
-        if [ ! -f kernel/feature/mount_hide.c ]; then
-          echo "[!] kernel/feature/mount_hide.c not found; skipping mount_hide patch."
-        elif grep -q "scoped to ISOLATED uid spaces" kernel/feature/mount_hide.c; then
-          echo "[*] mount_hide already scoped to isolated uids; skipping (idempotent)."
+        #    (fixes non-isolated app open("/proc/mounts")=-ENOENT -> PLOG(FATAL) bootloop)
+        if [ -f kernel/feature/mount_hide.c ]; then
+          if grep -q "scoped to ISOLATED uid spaces" kernel/feature/mount_hide.c; then
+            echo "[*] mount_hide already scoped to isolated uids; skipping (idempotent)."
+          else
+            apply "mount_hide isolated-only fix" \
+              "$PATCHDIR/0001-scope-mount-hide-to-isolated-uids.patch"
+          fi
         else
-          echo "[*] Applying mount_hide isolated-only patch"
-          patch -p1 --forward < "$PATCHDIR/0001-scope-mount-hide-to-isolated-uids.patch"
+          echo "[!] kernel/feature/mount_hide.c not found; skipping mount_hide patch."
         fi
-        # 2) throne_tracker: fix missing ';' (upstream SukiSU 05f5cdf0 compile break)
+        # 2) throne_tracker: add missing ';' after the initializer
+        #    (pre-existing SukiSU 05f5cdf0 compile break; no-op on other pins)
         if [ -f kernel/manager/throne_tracker.c ]; then
           if grep -q 'pos->depth };$' kernel/manager/throne_tracker.c; then
-            echo "[*] throne_tracker semicolon fix already present; skipping (idempotent)."
+            echo "[*] throne_tracker semicolon already present; skipping (idempotent)."
           else
-            echo "[*] Applying throne_tracker missing-semicolon fix"
-            patch -p1 --forward < "$PATCHDIR/0002-fix-throne-tracker-missing-semicolon.patch"
+            apply "throne_tracker missing-semicolon fix" \
+              "$PATCHDIR/0002-fix-throne-tracker-missing-semicolon.patch"
           fi
         fi
         echo "[*] SukiSU-Ultra source build-time fixes applied."
