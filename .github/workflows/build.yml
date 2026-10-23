@@ -325,6 +325,10 @@ jobs:
           sublevel: ${{ steps.extract.outputs.sublevel }}
           root_flavor: ${{ inputs.root_flavor }}
 
+      - name: Scope mount_hide to isolated uid spaces (SukiSU-Ultra)
+        if: inputs.root_flavor == 'sukisu-ultra'
+        uses: ./.github/actions/mount-hide
+
       - name: Fix selinux_hide pointer-bool-conversion on 6.6+ (ALL branches)
         shell: bash
         run: |

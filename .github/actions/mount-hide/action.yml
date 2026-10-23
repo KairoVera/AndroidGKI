@@ -1,0 +1,27 @@
+name: 'Scope mount_hide to isolated uid spaces'
+description: |
+  Patch the SukiSU-Ultra root source so mount_hide's /proc mount open-refusal
+  applies ONLY to isolated uid spaces. A non-isolated regular app (e.g.
+  com.miui.home, uid 10140) keeps a real /proc mount view; module unmounting is
+  kernel_umount.c's job. Without this, mount_hide refused a non-isolated app's
+  open("/proc/mounts") with -ENOENT -> PLOG(FATAL) -> desktop bootloop.
+runs:
+  using: composite
+  steps:
+    - name: Apply mount_hide isolated-only patch to the SukiSU-Ultra tree
+      working-directory: ${{ github.workspace }}/kernel/SukiSU-Ultra
+      shell: bash
+      run: |
+        set -euo pipefail
+        PATCH="${GITHUB_WORKSPACE}/.github/actions/mount-hide/patches/0001-scope-mount-hide-to-isolated-uids.patch"
+        if [ ! -f kernel/feature/mount_hide.c ]; then
+          echo "[!] kernel/feature/mount_hide.c not found in SukiSU-Ultra tree; skipping."
+          exit 0
+        fi
+        if grep -q "scoped to ISOLATED uid spaces" kernel/feature/mount_hide.c; then
+          echo "[*] mount_hide already scoped to isolated uids; skipping (idempotent)."
+          exit 0
+        fi
+        echo "[*] Applying mount_hide isolated-only patch"
+        patch -p1 --forward < "$PATCH"
+        echo "[*] Done. mount_hide open-refusal now applies to isolated uids only."

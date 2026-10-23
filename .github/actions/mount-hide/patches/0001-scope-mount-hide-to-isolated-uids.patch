@@ -1,0 +1,22 @@
+diff --git a/kernel/feature/mount_hide.c b/kernel/feature/mount_hide.c
+index fb795ae..a549162 100644
+--- a/kernel/feature/mount_hide.c
++++ b/kernel/feature/mount_hide.c
+@@ -103,9 +103,14 @@ static bool ksu_should_hide_mount_for_current(void)
+ 
+     uid = current_uid().val;
+     isolated = is_isolated_process(uid);
+-    if (!is_appuid(uid) && !isolated)
+-        return false;
+-    if (!isolated && !ksu_uid_should_umount(uid))
++    /* mount_hide's open-refusal is scoped to ISOLATED uid spaces only. Both
++     * probe models this feature exists to defeat (an AID_READPROC /proc/*
++     * scan and the zygote_next global-namespace read of /proc/self/mountinfo)
++     * are isolated. A regular app uid (e.g. com.miui.home, uid 10140) keeps a
++     * real /proc mount view; unmounting its module mounts is kernel_umount.c's
++     * job, not this one. Refusing a non-isolated app's open() with -ENOENT is
++     * what turned the desktop into a PLOG(FATAL) bootloop. */
++    if (!isolated)
+         return false;
+ 
+     return true;
