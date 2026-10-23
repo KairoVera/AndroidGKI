@@ -1,0 +1,12 @@
+diff -ru a/kernel/manager/throne_tracker.c b/kernel/manager/throne_tracker.c
+--- a/kernel/manager/throne_tracker.c	2026-10-24 00:26:52.260880535 +0800
++++ b/kernel/manager/throne_tracker.c	2026-10-24 00:28:01.868395655 +0800
+@@ -142,7 +142,7 @@
+                                           .data_path_list = &data_path_list,
+                                           .parent_dir = pos->dirpath,
+                                           .private_data = candidate_path,
+-                                          .depth = pos->depth }
++                                          .depth = pos->depth };
+ 
+             struct file *file = ksu_filp_open_nonotify(pos->dirpath, O_RDONLY | O_NOFOLLOW);
+             if (IS_ERR(file)) {

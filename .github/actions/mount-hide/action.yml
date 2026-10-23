@@ -1,27 +1,39 @@
-name: 'Scope mount_hide to isolated uid spaces'
+name: 'Apply SukiSU-Ultra source build-time fixes'
 description: |
-  Patch the SukiSU-Ultra root source so mount_hide's /proc mount open-refusal
-  applies ONLY to isolated uid spaces. A non-isolated regular app (e.g.
-  com.miui.home, uid 10140) keeps a real /proc mount view; module unmounting is
-  kernel_umount.c's job. Without this, mount_hide refused a non-isolated app's
-  open("/proc/mounts") with -ENOENT -> PLOG(FATAL) -> desktop bootloop.
+  Apply GCI build-time fixes to the SukiSU-Ultra root source tree:
+    1. mount_hide: narrow /proc mount open-refusal to isolated uid spaces only
+       (a non-isolated regular app such as com.miui.home, uid 10140 keeps a
+       real /proc mount view; module unmounting stays kernel_umount.c's job).
+       Without this, mount_hide refused a non-isolated app's open("/proc/mounts")
+       with -ENOENT -> PLOG(FATAL) -> desktop bootloop.
+    2. throne_tracker: add the missing ';' after the my_dir_context initializer
+       (pre-existing SukiSU-Ultra 05f5cdf0 compile break, -Werror).
+  Each patch is applied with patch -p1, idempotent, and safe-skips if absent.
 runs:
   using: composite
   steps:
-    - name: Apply mount_hide isolated-only patch to the SukiSU-Ultra tree
+    - name: Apply SukiSU-Ultra source build-time fixes
       working-directory: ${{ github.workspace }}/kernel/SukiSU-Ultra
       shell: bash
       run: |
         set -euo pipefail
-        PATCH="${GITHUB_WORKSPACE}/.github/actions/mount-hide/patches/0001-scope-mount-hide-to-isolated-uids.patch"
+        PATCHDIR="${GITHUB_WORKSPACE}/.github/actions/mount-hide/patches"
+        # 1) mount_hide: scope open-refusal to isolated uids
         if [ ! -f kernel/feature/mount_hide.c ]; then
-          echo "[!] kernel/feature/mount_hide.c not found in SukiSU-Ultra tree; skipping."
-          exit 0
-        fi
-        if grep -q "scoped to ISOLATED uid spaces" kernel/feature/mount_hide.c; then
+          echo "[!] kernel/feature/mount_hide.c not found; skipping mount_hide patch."
+        elif grep -q "scoped to ISOLATED uid spaces" kernel/feature/mount_hide.c; then
           echo "[*] mount_hide already scoped to isolated uids; skipping (idempotent)."
-          exit 0
+        else
+          echo "[*] Applying mount_hide isolated-only patch"
+          patch -p1 --forward < "$PATCHDIR/0001-scope-mount-hide-to-isolated-uids.patch"
         fi
-        echo "[*] Applying mount_hide isolated-only patch"
-        patch -p1 --forward < "$PATCH"
-        echo "[*] Done. mount_hide open-refusal now applies to isolated uids only."
+        # 2) throne_tracker: fix missing ';' (upstream SukiSU 05f5cdf0 compile break)
+        if [ -f kernel/manager/throne_tracker.c ]; then
+          if grep -q 'pos->depth };$' kernel/manager/throne_tracker.c; then
+            echo "[*] throne_tracker semicolon fix already present; skipping (idempotent)."
+          else
+            echo "[*] Applying throne_tracker missing-semicolon fix"
+            patch -p1 --forward < "$PATCHDIR/0002-fix-throne-tracker-missing-semicolon.patch"
+          fi
+        fi
+        echo "[*] SukiSU-Ultra source build-time fixes applied."
