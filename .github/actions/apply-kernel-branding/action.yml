@@ -32,6 +32,14 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
       run: |
+        # Kernel branding is COSMETIC (uname string only). It must never hard-fail the
+        # kernel build: the runner's default `bash -e` aborts this step on a `grep`
+        # no-match (5.10 has no KMI_GENERATION) or a `sed` on a tree layout where
+        # scripts/setlocalversion is not at this path (sed "can't read" -> exit 2 ->
+        # whole build red, make never runs). Drop errexit for this cosmetic step so
+        # every hiccup degrades to a warning instead of an abort.
+        set +e
+
         VERSION="${{ inputs.version }}"
         ANDROID_PART=$(echo "$VERSION" | cut -d- -f1)
         KERNEL_PART=$(echo "$VERSION" | cut -d- -f2)
@@ -43,9 +51,17 @@ runs:
           exit 0
         fi
 
+        # On some GKI trees / monthly 5.10 builds / device repos, scripts/setlocalversion
+        # is not present at this path. A missing cosmetic file is not a build error:
+        # warn and skip rather than run sed on a non-existent file.
+        if [ ! -f scripts/setlocalversion ]; then
+          echo "[!] scripts/setlocalversion not found at $PWD; skipping cosmetic kernel branding (build continues)."
+          exit 0
+        fi
+
         KMI=""
         if [ "$KEEP_KMI" = "true" ]; then
-          KMI=$(grep -h "^KMI_GENERATION" build.config.common build.config.constants 2>/dev/null | head -n 1 | cut -d= -f2)
+          KMI=$(grep -h "^KMI_GENERATION" build.config.common build.config.constants 2>/dev/null | head -n 1 | cut -d= -f2 || true)
           if [ -z "$KMI" ]; then
             echo "WARNING: KMI_GENERATION not found, falling back to legacy branding"
           fi
@@ -65,5 +81,5 @@ runs:
             sed -i '$d' scripts/setlocalversion && echo "echo \"-$ANDROID_PART-$BRAND\"" >> scripts/setlocalversion
           fi
         fi
-        chmod +x scripts/setlocalversion
-        tail -n 1 scripts/setlocalversion
+        chmod +x scripts/setlocalversion 2>/dev/null || true
+        tail -n 1 scripts/setlocalversion || true
