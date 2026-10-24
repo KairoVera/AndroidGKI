@@ -1,0 +1,81 @@
+--- a/security/selinux/avc.c
++++ b/security/selinux/avc.c
+@@ -27,6 +27,7 @@
+ #include <linux/audit.h>
+ #include <linux/ipv6.h>
+ #include <net/ipv6.h>
++#include <linux/string.h>
+ #include "avc.h"
+ #include "avc_ss.h"
+ #include "classmap.h"
+@@ -710,6 +711,40 @@
+  * @ab: the audit buffer
+  * @a: audit_data
+  */
++
++/* GCI root-evasion (Chunqiu detector, family 6): an untrusted app that walks
++ * /proc/<pid>/{attr/current,cmdline,comm} to enumerate root-domain processes
++ * triggers SELinux denials whose audit records carry
++ *   tcontext=u:r:ksu:s0 / u:r:su:s0 / u:r:magisk:s0 / u:r:apatch:s0 ...
++ * which `logcat -b events` / auditd can grep for. Scrub root-domain target
++ * contexts out of the AVC audit record so they are not observable from
++ * userspace. Minimal "AVC log spoof": only the logged context string is
++ * rewritten; the actual access decision (allow/deny) is unchanged.
++ */
++static bool avc_ctx_is_root_domain(const char *ctx)
++{
++	const char *dom, *end;
++	size_t n;
++
++	if (!ctx || ctx[0] != 'u' || ctx[1] != ':')
++		return false;
++	dom = ctx + 2;			/* "r:ksu:s0" */
++	if (dom[0] != 'r' || dom[1] != ':')
++		return false;
++	dom += 2;			/* domain name */
++	end = strchr(dom, ':');		/* type:typeattr part */
++	if (!end)
++		return false;
++	n = end - dom;
++	return (n == 3 && !strncmp(dom, "ksu", 3)) ||
++	       (n == 2 && !strncmp(dom, "su", 2)) ||
++	       (n == 6 && !strncmp(dom, "magisk", 6)) ||
++	       (n == 6 && !strncmp(dom, "apatch", 6)) ||
++	       (n == 7 && !strncmp(dom, "lsposed", 7)) ||
++	       (n == 4 && !strncmp(dom, "lspd", 4)) ||
++	       (n == 9 && !strncmp(dom, "kernel_su", 9));
++}
++
+ static void avc_audit_post_callback(struct audit_buffer *ab, void *a)
+ {
+ 	struct common_audit_data *ad = a;
+@@ -732,6 +767,10 @@
+ 				     &tcontext_len);
+ 	if (rc)
+ 		audit_log_format(ab, " tsid=%d", sad->tsid);
++	else if (avc_ctx_is_root_domain(tcontext))
++		/* scrub a root-domain target so it cannot be grepped in the
++		 * userspace-visible audit record (tcontext=u:r:ksu:s0). */
++		audit_log_format(ab, " tcontext=u:object_r:system_file:s0");
+ 	else
+ 		audit_log_format(ab, " tcontext=%s", tcontext);
+ 
+@@ -759,10 +798,14 @@
+ 	rc = security_sid_to_context_inval(sad->state, sad->tsid, &scontext,
+ 					   &scontext_len);
+ 	if (!rc && scontext) {
+-		if (scontext_len && scontext[scontext_len - 1] == '\0')
+-			scontext_len--;
+-		audit_log_format(ab, " trawcon=");
+-		audit_log_n_untrustedstring(ab, scontext, scontext_len);
++		if (avc_ctx_is_root_domain(scontext))
++			audit_log_format(ab, " trawcon=u:object_r:system_file:s0");
++		else {
++			if (scontext_len && scontext[scontext_len - 1] == '\0')
++				scontext_len--;
++			audit_log_format(ab, " trawcon=");
++			audit_log_n_untrustedstring(ab, scontext, scontext_len);
++		}
+ 		kfree(scontext);
+ 	}
+ }

@@ -1,0 +1,40 @@
+name: 'Apply Kernel Root-Hiding Patches'
+description: |
+  Apply GCI build-time kernel patches that hide root / patch-framework traces
+  from userspace root-detection tools (e.g. the Chunqiu Detector).
+
+  0001 = scrub root-domain target contexts (u:r:ksu/su/magisk/apatch/lsposed:*)
+         out of SELinux AVC audit records (security/selinux/avc.c), so the
+         detector's "current-app-root-domain-trace" — walk /proc/<pid>/attr/current,
+         then grep `logcat -b events` / auditd for `tcontext=u:r:ksu:s0` — cannot
+         enumerate root-domain processes. The access decision is unchanged; only
+         the logged context string is rewritten.
+
+  Patches are applied with `patch -p1 -N` (idempotent forward-only); each is
+  safe-skipped (never gates the build) when it does not apply at the pin.
+runs:
+  using: composite
+  steps:
+    - name: Apply Kernel Root-Hiding Patches
+      working-directory: ${{ github.workspace }}/kernel/common
+      shell: bash
+      run: |
+        set -uo pipefail
+        PATCHDIR="${{ github.action_path }}/patches"
+
+        if [ ! -f security/selinux/avc.c ]; then
+          echo "[!] security/selinux/avc.c not found at this pin; skipping root-hiding patch."
+          exit 0
+        fi
+
+        # 0001: scrub root-domain contexts from the SELinux AVC audit record.
+        # -N (forward-only) + safe-skip so a layout drift on another pin cannot
+        # gate the build; the actual allow/deny decision is left untouched.
+        if patch -p1 -N --dry-run < "$PATCHDIR/0001-selinux-avc-root-domain-scrub.patch" >/dev/null 2>&1; then
+          echo "[*] Applying 0001-selinux-avc-root-domain-scrub"
+          patch -p1 -N < "$PATCHDIR/0001-selinux-avc-root-domain-scrub.patch"
+        else
+          echo "[*] 0001-selinux-avc-root-domain-scrub not applicable at this pin; skipping (safe)."
+        fi
+
+        echo "[*] Kernel root-hiding patches applied."
