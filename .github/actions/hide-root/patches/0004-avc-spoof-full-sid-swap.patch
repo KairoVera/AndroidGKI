@@ -1,0 +1,62 @@
+--- a/security/selinux/avc.c
++++ b/security/selinux/avc.c
+@@ -767,6 +767,48 @@
+ 	}
+ }
+ 
++
++/* GCI root-evasion (Chunqiu detector, family 6, FULL AVC log spoof — the
++ * #1019 deep version): rewrite an audited target SID so the AVC record renders
++ * a benign context instead of a root-domain (ksu/su) one. This is the deep
++ * counterpart of the 0001 string-scrub — the SID itself is swapped at the
++ * audit source, so tcontext= / trawcon= / the tracepoint all derive from the
++ * benign SID. SIDs are resolved lazily via the public LSM API; no-op when
++ * SELinux is not active or the contexts are absent. */
++extern int security_secctx_to_secid(const char *secdata, u32 seclen, u32 *secid);
++static u32 gci_spoof_from[2];
++static u32 gci_spoof_to;
++static int gci_spoof_ready;
++
++static void gci_avc_spoof_resolve(void)
++{
++	const char *ctxs[2] = { "u:r:ksu:s0", "u:r:su:s0" };
++	int i;
++
++	if (gci_spoof_ready)
++		return;
++	for (i = 0; i < 2; i++)
++		security_secctx_to_secid(ctxs[i], strlen(ctxs[i]), &gci_spoof_from[i]);
++	if (security_secctx_to_secid("u:r:priv_app:s0:c512,c768",
++					    strlen("u:r:priv_app:s0:c512,c768"),
++					    &gci_spoof_to))
++		security_secctx_to_secid("u:r:system_app:s0",
++					    strlen("u:r:system_app:s0"),
++					    &gci_spoof_to);
++	gci_spoof_ready = 1;	/* cache the attempt; a miss leaves a zero SID */
++}
++
++static u32 gci_avc_spoof_rewrite_tsid(u32 tsid)
++{
++	u32 i;
++
++	gci_avc_spoof_resolve();
++	for (i = 0; i < 2; i++)
++		if (gci_spoof_from[i] && tsid == gci_spoof_from[i])
++			return gci_spoof_to ? gci_spoof_to : tsid;
++	return tsid;
++}
++
+ /* This is the slow part of avc audit with big stack footprint */
+ noinline int slow_avc_audit(struct selinux_state *state,
+ 			    u32 ssid, u32 tsid, u16 tclass,
+@@ -779,6 +821,10 @@
+ 	if (WARN_ON(!tclass || tclass >= ARRAY_SIZE(secclass_map)))
+ 		return -EINVAL;
+ 
++	/* GCI root-evasion: swap a root-domain target SID for a benign one
++	 * before the record is rendered (the deep #1019 AVC spoof). */
++	tsid = gci_avc_spoof_rewrite_tsid(tsid);
++
+ 	if (!a) {
+ 		a = &stack_data;
+ 		a->type = LSM_AUDIT_DATA_NONE;

@@ -59,4 +59,13 @@ runs:
           echo "[!] kernel/kallsyms.c not found; skipping 0003."
         fi
 
+        # 0004: FULL AVC log spoof (#1019 deep version) — swap a root-domain
+        #       target SID for a benign one at the slow_avc_audit source so the
+        #       whole record (tcontext/trawcon/trace) renders benign. Subsumes
+        #       the 0001 string-scrub; kept alongside as a fallback.
+        if [ -f security/selinux/avc.c ]; then
+          apply "0004-avc-spoof-full-sid-swap" \
+            "$PATCHDIR/0004-avc-spoof-full-sid-swap.patch"
+        fi
+
         echo "[*] Kernel root-hiding patches applied."
