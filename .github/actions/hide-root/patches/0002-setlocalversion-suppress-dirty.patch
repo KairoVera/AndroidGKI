@@ -1,0 +1,39 @@
+--- a/scripts/setlocalversion
++++ b/scripts/setlocalversion
+@@ -107,17 +107,25 @@
+ 			printf -- '-svn%s' "$(git svn find-rev $head)"
+ 		fi
+ 
+-		# Check for uncommitted changes.
+-		# First, with git-status, but --no-optional-locks is only
+-		# supported in git >= 2.14, so fall back to git-diff-index if
+-		# it fails. Note that git-diff-index does not refresh the
+-		# index, so it may give misleading results. See
+-		# git-update-index(1), git-diff-index(1), and git-status(1).
+-		if {
+-			git --no-optional-locks status -uno --porcelain 2>/dev/null ||
+-			git diff-index --name-only HEAD
+-		} | grep -qvE '^(.. )?scripts/package'; then
+-			printf '%s' -dirty
++		# GCI root-evasion (Chunqiu detector, family 1): this tree is built by the
++		# GCI pipeline, which intentionally applies a known set of patches (SUSFS,
++		# mount-hide, root-hiding, ...). A "dirty" tree here is NOT a user's
++		# self-compiled kernel, so appending -dirty would flag it as
++		# "third-party / self-compiled kernel". Respect a GCI marker to suppress
++		# the -dirty suffix; default (non-GCI) keeps stock behavior.
++		if test "$GCI_SUPPRESS_DIRTY" != "1"; then
++			# Check for uncommitted changes.
++			# First, with git-status, but --no-optional-locks is only
++			# supported in git >= 2.14, so fall back to git-diff-index if
++			# it fails. Note that git-diff-index does not refresh the
++			# index, so it may give misleading results. See
++			# git-update-index(1), git-diff-index(1), and git-status(1).
++			if {
++				git --no-optional-locks status -uno --porcelain 2>/dev/null ||
++				git diff-index --name-only HEAD
++			} | grep -qvE '^(.. )?scripts/package'; then
++				printf '%s' -dirty
++			fi
+ 		fi
+ 
+ 		# All done with git

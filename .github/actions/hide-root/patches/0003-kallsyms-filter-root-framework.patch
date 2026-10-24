@@ -1,0 +1,56 @@
+--- a/kernel/kallsyms.c
++++ b/kernel/kallsyms.c
+@@ -26,6 +26,7 @@
+ #include <linux/ftrace.h>
+ #include <linux/kprobes.h>
+ #include <linux/compiler.h>
++#include <linux/string.h>
+ 
+ /*
+  * These will be re-linked against their real values
+@@ -669,6 +670,31 @@
+ {
+ }
+ 
++
++/* GCI root-evasion (Chunqiu detector, family 4): an unprivileged reader of
++ * /proc/kallsyms (an app's root-detection tool) can enumerate every exported
++ * kernel symbol NAME. Root / patch-framework symbols (ksu_*, sukisu,
++ * susfs_*, magisk, apatch, lspd, lsposed, kernel_su, ...) betray a patched
++ * kernel. Legit kernel symbols never contain these markers, so hiding them
++ * from non-privileged readers (privileged/CAP_SYSLOG readers keep the full
++ * table) removes the tell without touching the symbol table BPF/perf/kgdb use. */
++static bool kallsym_name_is_root_framework(const char *name, const char *mod)
++{
++	static const char *const markers[] = {
++		"ksu", "sukisu", "susfs", "magisk", "apatch",
++		"lspd", "lsposed", "kernel_su", "ksupm", NULL
++	};
++	int i;
++
++	for (i = 0; markers[i]; i++)
++		if (name && strstr(name, markers[i]))
++			return true;
++	for (i = 0; markers[i]; i++)
++		if (mod && strstr(mod, markers[i]))
++			return true;
++	return false;
++}
++
+ static int s_show(struct seq_file *m, void *p)
+ {
+ 	void *value;
+@@ -678,6 +704,13 @@
+ 	if (!iter->name[0])
+ 		return 0;
+ 
++	/* GCI root-evasion (family 4): skip root/patch-framework symbol names for
++	 * unprivileged readers (addresses are already masked); privileged readers
++	 * (CAP_SYSLOG) still see the complete table. */
++	if (!iter->show_value &&
++	    kallsym_name_is_root_framework(iter->name, iter->module_name))
++		return 0;
++
+ 	value = iter->show_value ? (void *)iter->value : NULL;
+ 
+ 	if (iter->module_name[0]) {

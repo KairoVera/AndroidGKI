@@ -1,17 +1,14 @@
 name: 'Apply Kernel Root-Hiding Patches'
 description: |
-  Apply GCI build-time kernel patches that hide root / patch-framework traces
-  from userspace root-detection tools (e.g. the Chunqiu Detector).
-
-  0001 = scrub root-domain target contexts (u:r:ksu/su/magisk/apatch/lsposed:*)
-         out of SELinux AVC audit records (security/selinux/avc.c), so the
-         detector's "current-app-root-domain-trace" — walk /proc/<pid>/attr/current,
-         then grep `logcat -b events` / auditd for `tcontext=u:r:ksu:s0` — cannot
-         enumerate root-domain processes. The access decision is unchanged; only
-         the logged context string is rewritten.
-
-  Patches are applied with `patch -p1 -N` (idempotent forward-only); each is
-  safe-skipped (never gates the build) when it does not apply at the pin.
+  Apply GCI build-time kernel/common source patches that hide root /
+  patch-framework traces from userspace root-detection tools (e.g. the
+  Chunqiu Detector). Each is applied with `patch -p1 -N` (idempotent
+  forward-only) and safe-skipped (never gates the build) when it does not
+  apply at a pin. None change an access decision; they only rewrite what an
+  unprivileged user can read out of the kernel:
+    - 0001 SELinux AVC root-domain scrub   (family 6)
+    - 0002 setlocalversion -dirty suppress (family 1)
+    - 0003 /proc/kallsyms root-sym filter  (family 4)
 runs:
   using: composite
   steps:
@@ -22,19 +19,44 @@ runs:
         set -uo pipefail
         PATCHDIR="${{ github.action_path }}/patches"
 
-        if [ ! -f security/selinux/avc.c ]; then
-          echo "[!] security/selinux/avc.c not found at this pin; skipping root-hiding patch."
-          exit 0
+        apply() {
+          local label="$1" patchfile="$2"
+          if patch -p1 -N --dry-run < "$patchfile" >/dev/null 2>&1; then
+            echo "[*] Applying ${label}"
+            patch -p1 -N < "$patchfile"
+          else
+            echo "[*] ${label} not applicable at this pin; skipping (safe)."
+          fi
+        }
+
+        # 0001: scrub root-domain target contexts from the SELinux AVC audit
+        #       record (family 6) — defeats the 'current-app-root-domain-trace'
+        #       grep of tcontext=u:r:ksu:s0 in `logcat -b events` / auditd.
+        if [ -f security/selinux/avc.c ]; then
+          apply "0001-selinux-avc-root-domain-scrub" \
+            "$PATCHDIR/0001-selinux-avc-root-domain-scrub.patch"
+        else
+          echo "[!] security/selinux/avc.c not found; skipping 0001."
         fi
 
-        # 0001: scrub root-domain contexts from the SELinux AVC audit record.
-        # -N (forward-only) + safe-skip so a layout drift on another pin cannot
-        # gate the build; the actual allow/deny decision is left untouched.
-        if patch -p1 -N --dry-run < "$PATCHDIR/0001-selinux-avc-root-domain-scrub.patch" >/dev/null 2>&1; then
-          echo "[*] Applying 0001-selinux-avc-root-domain-scrub"
-          patch -p1 -N < "$PATCHDIR/0001-selinux-avc-root-domain-scrub.patch"
+        # 0002: suppress the -dirty localversion suffix (family 1) so the GCI
+        #       kernel does not advertise itself as a "self-compiled /
+        #       third-party kernel". Honored only when GCI_SUPPRESS_DIRTY=1.
+        if [ -f scripts/setlocalversion ]; then
+          apply "0002-setlocalversion-suppress-dirty" \
+            "$PATCHDIR/0002-setlocalversion-suppress-dirty.patch"
+          echo "GCI_SUPPRESS_DIRTY=1" >> "$GITHUB_ENV"
         else
-          echo "[*] 0001-selinux-avc-root-domain-scrub not applicable at this pin; skipping (safe)."
+          echo "[!] scripts/setlocalversion not found; skipping 0002."
+        fi
+
+        # 0003: hide root/patch-framework symbol names from unprivileged
+        #       /proc/kallsyms readers (family 4); CAP_SYSLOG readers keep all.
+        if [ -f kernel/kallsyms.c ]; then
+          apply "0003-kallsyms-filter-root-framework" \
+            "$PATCHDIR/0003-kallsyms-filter-root-framework.patch"
+        else
+          echo "[!] kernel/kallsyms.c not found; skipping 0003."
         fi
 
         echo "[*] Kernel root-hiding patches applied."
