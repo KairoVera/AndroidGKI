@@ -259,7 +259,12 @@ jobs:
           # SukiSU-Ultra: builtin tip (2026-10-21,
           # "kernel: switch sig_fallback hook from weak symbol to static_call");
           # defines fake_state itself, calls the susfs_def.h no_su API -> OK on tips.
-          PIN_SUKISU_ULTRA="05f5cdf082d32bbc651c205ba4bdd1dc66cca7f5"
+          # Locked to ce75122b for mount_hide verification: the 05f5cdf0 tip has
+          # a pre-existing vmlinux link break on android12-5.10 (undefined
+          # ksu_preinit_*/ksu_manager_appid/my_* symbols + .btf.vmlinux.bin.o),
+          # unrelated to mount_hide. ce75122b is the last known-good SukiSU
+          # commit that builds; verify the mount_hide fix on it first.
+          PIN_SUKISU_ULTRA="ce75122bec7423e0f1fa06e3e9a174085c5231ab"
           # FinaSU: susfs-integrated fork of the tiann restructure; pin tracks
           # the susfs4ksu v2.3 ABI era its supercall dispatch is written against.
           # master tip 3f06a69d (2026-10-21, manager install-page animation;
