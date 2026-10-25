@@ -6,8 +6,6 @@ description: |
        real /proc mount view; module unmounting stays kernel_umount.c's job).
        Without this, mount_hide refused a non-isolated app's open("/proc/mounts")
        with -ENOENT -> PLOG(FATAL) -> desktop bootloop.
-    2. throne_tracker: add the missing ';' after the my_dir_context initializer
-       (pre-existing SukiSU-Ultra 05f5cdf0 compile break, -Werror).
   Each patch is applied with patch -p1, idempotent, and safe-skips if absent.
 runs:
   using: composite
@@ -41,15 +39,5 @@ runs:
           fi
         else
           echo "[!] kernel/feature/mount_hide.c not found; skipping mount_hide patch."
-        fi
-        # 2) throne_tracker: add missing ';' after the initializer
-        #    (pre-existing SukiSU 05f5cdf0 compile break; no-op on other pins)
-        if [ -f kernel/manager/throne_tracker.c ]; then
-          if grep -q 'pos->depth };$' kernel/manager/throne_tracker.c; then
-            echo "[*] throne_tracker semicolon already present; skipping (idempotent)."
-          else
-            apply "throne_tracker missing-semicolon fix" \
-              "$PATCHDIR/0002-fix-throne-tracker-missing-semicolon.patch"
-          fi
         fi
         echo "[*] SukiSU-Ultra source build-time fixes applied."

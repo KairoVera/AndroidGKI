@@ -260,7 +260,7 @@ jobs:
           # ksu_preinit_*/ksu_manager_appid/my_* symbols + .btf.vmlinux.bin.o),
           # unrelated to mount_hide. ce75122b is the last known-good SukiSU
           # commit that builds; verify the mount_hide fix on it first.
-          PIN_SUKISU_ULTRA="ce75122bec7423e0f1fa06e3e9a174085c5231ab"
+          PIN_SUKISU_ULTRA="a864d15ab8984c15bf585fb9e4dfbc6ccc8aaee1"
           # FinaSU: susfs-integrated fork of the tiann restructure; pin tracks
           # the susfs4ksu v2.3 ABI era its supercall dispatch is written against.
           # master tip 3f06a69d (2026-10-21, manager install-page animation;
