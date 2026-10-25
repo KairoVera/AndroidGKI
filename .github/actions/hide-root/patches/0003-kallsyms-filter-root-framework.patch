@@ -1,14 +1,6 @@
 --- a/kernel/kallsyms.c
 +++ b/kernel/kallsyms.c
-@@ -26,6 +26,7 @@
- #include <linux/ftrace.h>
- #include <linux/kprobes.h>
- #include <linux/compiler.h>
-+#include <linux/string.h>
- 
- /*
-  * These will be re-linked against their real values
-@@ -669,6 +670,31 @@
+@@ -669,6 +669,48 @@
  {
  }
  
@@ -19,7 +11,24 @@
 + * susfs_*, magisk, apatch, lspd, lsposed, kernel_su, ...) betray a patched
 + * kernel. Legit kernel symbols never contain these markers, so hiding them
 + * from non-privileged readers (privileged/CAP_SYSLOG readers keep the full
-+ * table) removes the tell without touching the symbol table BPF/perf/kgdb use. */
++ * table) removes the tell without touching the symbol table BPF/perf/kgdb
++ * use. String matching is done by hand so this patch needs no extra headers
++ * and stays minimal (single-region, robust across 5.10 sublevel tags). */
++static bool gci_str_contains(const char *h, const char *n)
++{
++	while (*h) {
++		const char *a = h, *b = n;
++		while (*b && *a == *b) {
++			a++;
++			b++;
++		}
++		if (!*b)
++			return true;
++		h++;
++	}
++	return false;
++}
++
 +static bool kallsym_name_is_root_framework(const char *name, const char *mod)
 +{
 +	static const char *const markers[] = {
@@ -29,10 +38,10 @@
 +	int i;
 +
 +	for (i = 0; markers[i]; i++)
-+		if (name && strstr(name, markers[i]))
++		if (gci_str_contains(name, markers[i]))
 +			return true;
 +	for (i = 0; markers[i]; i++)
-+		if (mod && strstr(mod, markers[i]))
++		if (gci_str_contains(mod, markers[i]))
 +			return true;
 +	return false;
 +}
@@ -40,7 +49,7 @@
  static int s_show(struct seq_file *m, void *p)
  {
  	void *value;
-@@ -678,6 +704,13 @@
+@@ -678,6 +720,13 @@
  	if (!iter->name[0])
  		return 0;
  
