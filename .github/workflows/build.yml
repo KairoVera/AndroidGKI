@@ -318,10 +318,6 @@ jobs:
           sublevel: ${{ steps.extract.outputs.sublevel }}
           root_flavor: ${{ inputs.root_flavor }}
 
-      - name: Apply SukiSU-Ultra source build-time fixes (mount_hide scope + throne_tracker)
-        if: inputs.root_flavor == 'sukisu-ultra'
-        uses: ./.github/actions/mount-hide
-
       - name: Apply Kernel Root-Hiding Patches (SELinux AVC root-domain scrub)
         if: inputs.root_flavor == 'sukisu-ultra'
         uses: ./.github/actions/hide-root
