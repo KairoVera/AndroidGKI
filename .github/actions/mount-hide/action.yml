@@ -8,6 +8,13 @@ description: |
        with -ENOENT -> PLOG(FATAL) -> desktop bootloop.
     2. throne_tracker: add the missing ';' after the my_dir_context initializer
        (pre-existing SukiSU-Ultra 05f5cdf0 compile break, -Werror).
+    3. uts_spoof: add the UTS (kernel release/version) spoof extension, mirroring
+       cpu_spoof (new extension/uts_spoof.{c,h} + uapi enum id 5 +
+       ksu_set_spoof_version_cmd + extension.c registration + ksu_main.c
+       includes). Lets the manager rewrite `uname` release/version to a
+       stock-like string (a custom kernel release string is a root-detection
+       tell). Brought forward from SukiSU main via patch since the builtin
+       baseline is slow to update.
   Each patch is applied with patch -p1, idempotent, and safe-skips if absent.
 runs:
   using: composite
@@ -50,6 +57,20 @@ runs:
           else
             apply "throne_tracker missing-semicolon fix" \
               "$PATCHDIR/0002-fix-throne-tracker-missing-semicolon.patch"
+          fi
+        fi
+        # 3) uts_spoof: UTS (kernel release/version) spoof extension
+        #    (spoof `uname` release string = a root-detection tell -> stock-like).
+        #    Mirrors cpu_spoof. Multi-file patch: new extension/uts_spoof.{c,h}
+        #    + uapi/extension.h (KSU_EXTENSION_UTS_SPOOF=5 + ksu_set_spoof_version_cmd)
+        #    + extension.c registration + ksu_main.c includes. Brought forward from
+        #    SukiSU main (builtin baseline slow to update).
+        if [ -f kernel/extension/extension.c ]; then
+          if grep -q 'uts_spoof' kernel/extension/extension.c 2>/dev/null; then
+            echo "[*] uts_spoof already applied; skipping (idempotent)."
+          else
+            apply "uts_spoof extension (UTS release/version spoof)" \
+              "$PATCHDIR/0004-sukisu-uts-spoof.patch"
           fi
         fi
         echo "[*] SukiSU-Ultra source build-time fixes applied."

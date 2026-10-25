@@ -1,0 +1,124 @@
+--- /dev/null
++++ b/kernel/extension/uts_spoof.h
+@@ -0,0 +1,7 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef __KSU_H_EXTENSION_UTS_SPOOF
++#define __KSU_H_EXTENSION_UTS_SPOOF
++
++int ksu_extension_uts_spoof_io(u32 id, void __user *raw);
++
++#endif /* __KSU_H_EXTENSION_UTS_SPOOF */
+--- /dev/null
++++ b/kernel/extension/uts_spoof.c
+@@ -0,0 +1,52 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * UTS (kernel release / version string) spoof extension.
++ *
++ * io-only, like cpu_spoof: handler presence is the signal. The manager
++ * (or a boot hook) sends ksu_set_spoof_version_cmd{release, version}; we
++ * rewrite the initial UTS namespace's name.release / name.version so that
++ * `uname` reports a chosen (stock-like) string. A custom kernel release
++ * string is a root-detection tell, so spoofing it hardens the stock-like
++ * posture SuStock aims for.
++ *
++ * Written against the running kernel's UTS symbols (init_uts_ns / uts_sem)
++ * so it is correct on the pinned 5.10 tree without runtime symbol
++ * resolution.
++ */
++#include <linux/kernel.h>
++#include <linux/errno.h>
++#include <linux/rwsem.h>
++#include <linux/utsname.h>
++#include <linux/uaccess.h>
++#include <linux/string.h>
++
++#include "uts_spoof.h"
++
++extern struct rw_semaphore uts_sem;
++
++int ksu_extension_uts_spoof_io(u32 id, void __user *raw)
++{
++    struct ksu_set_spoof_version_cmd cmd;
++
++    if (copy_from_user(&cmd, raw, sizeof(cmd)))
++        return -EFAULT;
++
++    cmd.release[sizeof(cmd.release) - 1] = '\0';
++    cmd.version[sizeof(cmd.version) - 1] = '\0';
++
++    if (cmd.release[0] == '\0' && cmd.version[0] == '\0')
++        return 0;
++
++    down_write(&uts_sem);
++    if (cmd.release[0] != '\0')
++        strlcpy(init_uts_ns.name.release, (const char *)cmd.release,
++                sizeof(init_uts_ns.name.release));
++    if (cmd.version[0] != '\0')
++        strlcpy(init_uts_ns.name.version, (const char *)cmd.version,
++                sizeof(init_uts_ns.name.version));
++    up_write(&uts_sem);
++
++    pr_info("ksu: uts_spoof: release=%s version=%s\n",
++            init_uts_ns.name.release, init_uts_ns.name.version);
++    return 0;
++}
+--- a/kernel/include/uapi/extension.h
++++ b/kernel/include/uapi/extension.h
+@@ -62,6 +62,7 @@
+     KSU_EXTENSION_UMOUNT_PATHS = 2,
+     KSU_EXTENSION_DYNAMIC_MANAGER = 3,
+     KSU_EXTENSION_SUSFS = 4,
++    KSU_EXTENSION_UTS_SPOOF = 5,
+ 
+     KSU_EXTENSION_MAX
+ };
+@@ -110,6 +111,11 @@
+     __u64 hwcap;      /* Main ELF Hardware Capabilities mask */
+     __u64 hwcap2;     /* Auxiliary ELF Hardware Capabilities mask */
+ };
++// UTS_SPOOF
++struct ksu_set_spoof_version_cmd {
++    __u8 release[65]; /* e.g. "5.10.115-android12-9-g00000000" */
++    __u8 version[65]; /* e.g. "#1 SMP PREEMPT ..." */
++};
+ // 2. UMOUNT_PATHS
+ struct ksu_list_try_umount_cmd {
+     __aligned_u64 arg; // User buffer
+--- a/kernel/extension/extension.c
++++ b/kernel/extension/extension.c
+@@ -28,6 +28,7 @@
+     [KSU_EXTENSION_UMOUNT_PATHS] = "umount_paths",
+     [KSU_EXTENSION_DYNAMIC_MANAGER] = "dynamic_manager",
+     [KSU_EXTENSION_SUSFS] = "susfs",
++    [KSU_EXTENSION_UTS_SPOOF] = "uts_spoof",
+ };
+ 
+ /*
+@@ -450,6 +451,8 @@
+         pr_err("extension: failed to register dynamic_manager\n");
+     if (ksu_register_extension_handler(&susfs_handler))
+         pr_err("extension: failed to register susfs\n");
++    if (ksu_register_extension_handler(&uts_spoof_handler))
++        pr_err("extension: failed to register uts_spoof\n");
+ 
+     /* Publish: any future ksu_extension_apply_forced() is now safe.
+      * The release-store pairs with the acquire-load in
+--- a/kernel/ksu_main.c
++++ b/kernel/ksu_main.c
+@@ -59,6 +59,7 @@
+ 
+ #include "extension/extension.h"
+ #include "extension/cpu_spoof.h"
++#include "extension/uts_spoof.h"
+ #include "extension/umount_paths.h"
+ #include "extension/dynamic_manager.h"
+ #include "extension/kpm.h"
+@@ -77,6 +78,7 @@
+ // unity build
+ #include "extension/extension.c"
+ #include "extension/cpu_spoof.c"
++#include "extension/uts_spoof.c"
+ #include "extension/umount_paths.c"
+ #include "extension/dynamic_manager.c"
+ #include "extension/kpm.c"
