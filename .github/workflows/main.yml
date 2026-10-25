@@ -267,7 +267,7 @@ jobs:
           # kernel ABI unchanged).
           PIN_FINASU="3f06a69d40db4cbb5b86d239694c5adf911b2cce"
           declare -A PIN_SUSFS=(
-            [susfs_commit_android12_5_10]="f43926dc94b8ffbf9b74321313536600f69367b1"
+            [susfs_commit_android12_5_10]="5419f4ee97cc8bf7ca67a9ff207f39653d7784f4"
             [susfs_commit_android13_5_10]="cbe3fe7b9fa599d316f68b08b06cde48218eaff5"
             [susfs_commit_android13_5_15]="86b5b10068459dedb545dc5db46a0f0254428eda"
             [susfs_commit_android14_5_15]="10b4f2156470338a5db2040f3d85992c285aa595"
