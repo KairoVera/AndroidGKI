@@ -1,0 +1,29 @@
+--- a/kernel/policy/app_profile.c
++++ b/kernel/policy/app_profile.c
+@@ -1,3 +1,5 @@
++#include "infra/seccomp_cache.h" /* GCI seccomp: ksu_seccomp_allow_cache (keep filter + whitelist reboot) */
++
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0)
+ static struct group_info root_groups = { .usage = REFCOUNT_INIT(2) };
+ #else
+@@ -191,8 +193,18 @@
+     commit_creds(cred);
+ 
+ #ifdef CONFIG_KSU_SUSFS
+-    if (likely(test_thread_flag(TIF_SECCOMP)))
+-        disable_seccomp();
++    /* GCI/SukiSU root-evasion: keep the inherited seccomp-bpf filter ACTIVE
++       instead of tearing it down. A filter-less root context deviates from
++       stock Android app behavior (a detection tell); keeping filter mode and
++       only whitelisting reboot (exactly what the mainline setuid_hook path
++       already does) is both safer and less detectable, and the manager then
++       reports "Seccomp: enabled". The non-SUSFS build keeps the old
++       unconditional disable_seccomp() below (unchanged). */
++    if (current->seccomp.mode == SECCOMP_MODE_FILTER && current->seccomp.filter) {
++        spin_lock_irq(&current->sighand->siglock);
++        ksu_seccomp_allow_cache(current->seccomp.filter, __NR_reboot);
++        spin_unlock_irq(&current->sighand->siglock);
++    }
+ #else
+     disable_seccomp();
+ #endif
