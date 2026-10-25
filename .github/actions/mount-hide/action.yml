@@ -52,17 +52,4 @@ runs:
               "$PATCHDIR/0002-fix-throne-tracker-missing-semicolon.patch"
           fi
         fi
-        # 3) app_profile: keep seccomp filter mode (stock-like) for SUSFS builds
-        #    instead of SukiSU's unconditional disable_seccomp(); a filter-less root
-        #    context deviates from stock Android app behavior and is a detection
-        #    tell. Whitelists reboot so root tooling still works. Only live when
-        #    CONFIG_KSU_SUSFS is set (our GCI builds); inert otherwise.
-        if [ -f kernel/policy/app_profile.c ]; then
-          if grep -q 'GCI/SukiSU root-evasion: keep the inherited seccomp-bpf' kernel/policy/app_profile.c; then
-            echo "[*] app_profile seccomp keep-filter already present; skipping (idempotent)."
-          else
-            apply "0003-sukisu-app-profile-seccomp-keep-filter" \
-              "$PATCHDIR/0003-sukisu-app-profile-seccomp-keep-filter.patch"
-          fi
-        fi
         echo "[*] SukiSU-Ultra source build-time fixes applied."
