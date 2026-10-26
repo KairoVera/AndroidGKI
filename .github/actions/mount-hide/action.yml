@@ -14,6 +14,7 @@ runs:
   steps:
     - name: Apply SukiSU-Ultra source build-time fixes
       shell: bash
+      working-directory: ${{ github.workspace }}/kernel/SukiSU-Ultra
       run: |
         set -o pipefail
         PATCHDIR="$(cd "${{ github.action_path }}/patches" && pwd)"
