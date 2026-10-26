@@ -1,0 +1,41 @@
+name: Apply SukiSU-Ultra source build-time fixes (mnt-ns-isolate)
+description: |
+  SukiSU-Ultra builtin (unity build) source fixes, applied before the
+  kernel/manager build on the a864d15a baseline.
+    1. mnt-ns-isolate: give a managed non-isolated app a private mount
+       namespace (unshare CLONE_NEWNS) in ksu_handle_umount, so the module-mount
+       umount runs in a copy (not the global namespace), AND scope mount-hide to
+       isolated apps only. Net effect: the launcher/desktop reads a clean
+       /proc/mounts instead of hitting the -ENOENT block that PLOGs it to a
+       bootloop.
+  Each patch is applied with patch -p1, idempotent, and safe-skips if absent.
+runs:
+  using: composite
+  inputs:
+    root_flavor:
+      required: true
+      description: The root flavor (used to gate SukiSU-only source fixes).
+  steps:
+    - name: Apply SukiSU-Ultra source build-time fixes
+      if: inputs.root_flavor == 'sukisu-ultra'
+      shell: bash
+      run: |
+        set -o pipefail
+        PATCHDIR="$(cd "${{ github.action_path }}/patches" && pwd)"
+        apply() {
+          local label="$1" patch="$2"
+          echo "==> Applying SukiSU source fix: $label"
+          if ! patch -p1 -N --dry-run < "$patch" >/dev/null 2>&1; then
+            patch -p1 -N --forward < "$patch" || {
+              echo "[!!] $label apply hit rejects; aborting build to surface it."
+              ls "$PWD"/kernel/rej "$PWD"/**/*.rej 2>/dev/null || true
+              exit 1
+            }
+          else
+            echo "[*] $label already present; skipping (idempotent)."
+          fi
+        }
+        # 1) mnt-ns-isolate: private mnt ns for managed non-isolated apps + isolate-only mount-hide
+        apply "sukisu mnt-ns-isolate (mount-hide desktop fix)" \
+          "$PATCHDIR/0005-sukisu-mnt-ns-isolate.patch"
+        echo "[*] SukiSU-Ultra source build-time fixes applied."

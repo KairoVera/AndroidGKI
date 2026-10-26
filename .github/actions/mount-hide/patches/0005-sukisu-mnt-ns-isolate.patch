@@ -1,0 +1,40 @@
+diff --git a/kernel/feature/kernel_umount.c b/kernel/feature/kernel_umount.c
+index ef9d8abd..21d62e74 100644
+--- a/kernel/feature/kernel_umount.c
++++ b/kernel/feature/kernel_umount.c
+@@ -92,6 +92,17 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
+         return 0;
+     }
+ #endif
++    /* NS isolation: give a managed non-isolated app (should_umount, e.g. the
++     * launcher/desktop) a private mount namespace before the module-mount
++     * umount below. The umount then runs in a copy of the namespace, not the
++     * global one (umounting the global namespace would be a disaster). The app
++     * then sees a clean /proc/mounts, so the mount_hide -ENOENT block is no
++     * longer required for it. Safe-skip: only unshares for a managed
++     * non-isolated app reaching this point. */
++    if (!is_isolated_process(new_uid) && is_appuid(new_uid)) {
++        setup_mount_ns(KSU_NS_INDIVIDUAL);
++    }
++
+     // umount the target mnt
+     pr_info("handle umount for uid: %d, pid: %d\n", new_uid, current->pid);
+ 
+diff --git a/kernel/feature/mount_hide.c b/kernel/feature/mount_hide.c
+index fb795aec..cd95cbab 100644
+--- a/kernel/feature/mount_hide.c
++++ b/kernel/feature/mount_hide.c
+@@ -105,7 +105,12 @@ static bool ksu_should_hide_mount_for_current(void)
+     isolated = is_isolated_process(uid);
+     if (!is_appuid(uid) && !isolated)
+         return false;
+-    if (!isolated && !ksu_uid_should_umount(uid))
++    /* NS isolation: managed non-isolated apps now run in a private mount
++     * namespace with their module mounts umounted (see ksu_handle_umount), so
++     * their /proc/mounts is already clean. Blocking it with -ENOENT would
++     * crash a launcher that PLOGs on a missing /proc/mounts. Only hide for
++     * isolated processes, whose global-namespace probe this defeats. */
++    if (!isolated)
+         return false;
+ 
+     return true;
