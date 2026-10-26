@@ -252,15 +252,15 @@ jobs:
           # `fake_state` and will fail to link with latest BakaSU; 6.6/6.12 are
           # unaffected. Watch those 5 families for build failures.
           PIN_BAKASU="dac2d186406a0d2b0ce3c67cad5a1fa1adbf9f4d"
-          # SukiSU-Ultra: builtin tip (2026-10-21,
-          # "kernel: switch sig_fallback hook from weak symbol to static_call");
-          # defines fake_state itself, calls the susfs_def.h no_su API -> OK on tips.
-          # Locked to ce75122b for mount_hide verification: the 05f5cdf0 tip has
-          # a pre-existing vmlinux link break on android12-5.10 (undefined
-          # ksu_preinit_*/ksu_manager_appid/my_* symbols + .btf.vmlinux.bin.o),
-          # unrelated to mount_hide. ce75122b is the last known-good SukiSU
-          # commit that builds; verify the mount_hide fix on it first.
-          PIN_SUKISU_ULTRA="a864d15ab8984c15bf585fb9e4dfbc6ccc8aaee1"
+          # SukiSU-Ultra: pin = latest builtin tip (2026-10-26,
+          # "feat(kpm): unify KernelPatch bridge for built-in and LKM modes").
+          # 6397fcb5 only touches kernel/extension/kpm/* (KPM bridge); it does
+          # NOT touch mount_hide/kernel_umount/su_mount_ns, so the 0005
+          # mnt-ns-isolate patch (isolate-only mount-hide + private mnt ns for
+          # managed non-isolated apps, fixing the desktop -ENOENT bootloop
+          # reintroduced by upstream "Reimplement mount_hide") still applies
+          # clean against it. SUSFS stays at 5419f4ee (KPM adds no SUSFS need).
+          PIN_SUKISU_ULTRA="6397fcb5d96e8f4953c71e02c73f8c6800541bff"
           # FinaSU: susfs-integrated fork of the tiann restructure; pin tracks
           # the susfs4ksu v2.3 ABI era its supercall dispatch is written against.
           # master tip 3f06a69d (2026-10-21, manager install-page animation;
