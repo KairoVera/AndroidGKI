@@ -2,10 +2,7 @@ diff --git a/kernel/feature/kernel_umount.c b/kernel/feature/kernel_umount.c
 index ef9d8abd..21d62e74 100644
 --- a/kernel/feature/kernel_umount.c
 +++ b/kernel/feature/kernel_umount.c
-@@ -92,6 +92,17 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
-         return 0;
-     }
- #endif
+@@ -95,2 +95,13 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
 +    /* NS isolation: give a managed non-isolated app (should_umount, e.g. the
 +     * launcher/desktop) a private mount namespace before the module-mount
 +     * umount below. The umount then runs in a copy of the namespace, not the
