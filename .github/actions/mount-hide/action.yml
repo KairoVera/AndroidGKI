@@ -11,13 +11,8 @@ description: |
   Each patch is applied with patch -p1, idempotent, and safe-skips if absent.
 runs:
   using: composite
-  inputs:
-    root_flavor:
-      required: true
-      description: The root flavor (used to gate SukiSU-only source fixes).
   steps:
     - name: Apply SukiSU-Ultra source build-time fixes
-      if: inputs.root_flavor == 'sukisu-ultra'
       shell: bash
       run: |
         set -o pipefail
