@@ -252,10 +252,13 @@ jobs:
           # `fake_state` and will fail to link with latest BakaSU; 6.6/6.12 are
           # unaffected. Watch those 5 families for build failures.
           PIN_BAKASU="dac2d186406a0d2b0ce3c67cad5a1fa1adbf9f4d"
-          # SukiSU-Ultra: builtin tip (2026-10-21,
-          # "kernel: switch sig_fallback hook from weak symbol to static_call");
+          # SukiSU-Ultra: builtin tip (2026-10-27,
+          # "fix builtin branch fails to build on 4.14 non-GKI
+          # (selinux_hide / fallthrough / user_arg_ptr)");
+          # also picks up KPM post-fs-data (#c02870a), version_spoof ext (#1023),
+          # and the unify-KernelPatch-bridge KPM work (#6397fcb) above 05f5cdf0.
           # defines fake_state itself, calls the susfs_def.h no_su API -> OK on tips.
-          PIN_SUKISU_ULTRA="05f5cdf082d32bbc651c205ba4bdd1dc66cca7f5"
+          PIN_SUKISU_ULTRA="0b666cad90f3a13cb4085f8c88e5144594e82030"
           # FinaSU: susfs-integrated fork of the tiann restructure; pin tracks
           # the susfs4ksu v2.3 ABI era its supercall dispatch is written against.
           # master tip 3f06a69d (2026-10-21, manager install-page animation;
