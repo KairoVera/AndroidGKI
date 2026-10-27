@@ -287,7 +287,13 @@ jobs:
           )
           # SukiSU-Ultra keeps its own SUSFS pin set too (same starting values).
           declare -A PIN_SUSFS_SUKISU_ULTRA=(
-            [susfs_commit_android12_5_10]="f43926dc94b8ffbf9b74321313536600f69367b1"
+            # Bumped to gki-android12-5.10 tip 5419f4ee (2026-10-24) which has
+            # the SUSFS priority-uid-filter API (added in 35cbfe1) that
+            # SukiSU-Ultra 0b666ca (a864d15) now references:
+            # susfs_parse_priority_app_strings / CMD_SUSFS_SET_PRIORITY_UID_FILTER
+            # / susfs_set_priority_uid_filter. Old pin f43926dc predates it and
+            # fails to compile ksu_main.o against 0b666ca.
+            [susfs_commit_android12_5_10]="5419f4ee97cc8bf7ca67a9ff207f39653d7784f4"
             [susfs_commit_android13_5_10]="cbe3fe7b9fa599d316f68b08b06cde48218eaff5"
             [susfs_commit_android13_5_15]="86b5b10068459dedb545dc5db46a0f0254428eda"
             [susfs_commit_android14_5_15]="10b4f2156470338a5db2040f3d85992c285aa595"
