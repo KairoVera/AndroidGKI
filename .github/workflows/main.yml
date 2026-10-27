@@ -260,7 +260,7 @@ jobs:
           # managed non-isolated apps, fixing the desktop -ENOENT bootloop
           # reintroduced by upstream "Reimplement mount_hide") still applies
           # clean against it. SUSFS stays at 5419f4ee (KPM adds no SUSFS need).
-          PIN_SUKISU_ULTRA="fbc67d004b3b68723e91dd86d50dead1120b4a9a"
+          PIN_SUKISU_ULTRA="6397fcb5d96e8f4953c71e02c73f8c6800541bff"
           # FinaSU: susfs-integrated fork of the tiann restructure; pin tracks
           # the susfs4ksu v2.3 ABI era its supercall dispatch is written against.
           # master tip 3f06a69d (2026-10-21, manager install-page animation;
