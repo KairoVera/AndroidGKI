@@ -420,6 +420,17 @@ jobs:
           version: ${{ inputs.version }}
           kernel_version: ${{ inputs.kernel_version }}
 
+      # OFF BY DEFAULT: CONFIG_FANOTIFY changes struct user_namespace and
+      # struct fsnotify_group, which moves the CRCs of the kuid/kgid helpers and
+      # the exported fsnotify_* calls - prebuilt vendor modules then refuse to
+      # load. The port below restores stock layouts and keeps the limits, but it
+      # is opt-in: dispatch with use_fanotify=true to exercise it.
+      - name: fanotify (ported for zero ABI drift)
+        if: contains(inputs.feature_set, 'FANOTIFY')
+        uses: ./.github/actions/fanotify
+        with:
+          version: ${{ inputs.version }}
+
       - name: Apply NTSync Patches
         if: contains(inputs.feature_set, 'NTSync')
         uses: ./.github/actions/ntsync
