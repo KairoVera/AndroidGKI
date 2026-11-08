@@ -405,6 +405,25 @@ jobs:
           os_patch_level: ${{ inputs.os_patch_level }}
           droidspaces_commit: ${{ inputs.droidspaces_commit }}
 
+      - name: USB Arsenal Patches
+        # USB gadget functions (mass storage, HID, NCM) plus the kernel-patches
+        # folder that makes a second gadget instance and CD-ROM/DVD emulation work.
+        # 6.1 has no patch set of its own upstream, so it takes the 5.15 one.
+        if: contains(inputs.feature_set, 'USBA') || inputs.feature_set == 'All'
+        uses: ./.github/actions/usb-arsenal
+        with:
+          version: ${{ inputs.version }}
+          kernel_version: ${{ inputs.kernel_version }}
+
+      # ON BY DEFAULT, and it is NOT free - measured, not assumed. Enabling it
+      # changes struct cfs_rq (cfs_bandwidth, throttled lists, throttled_count),
+      # and struct rq embeds struct cfs_rq. struct rq * appears in the prototypes
+      # of exported symbols - the android vendor-hook tracepoints
+      # (__traceiter_android_rvh_*), __task_rq_lock, __migrate_task,
+      # __balance_callbacks - so genksyms expands it and their CRCs move. That
+      # is what the "breaks the ABI" note was about; include/ has no
+      # CONFIG_CFS_BANDWIDTH reference at all, which is why grepping headers
+      # misses it.
       - name: Apply NTSync Patches
         if: contains(inputs.feature_set, 'NTSync')
         uses: ./.github/actions/ntsync
