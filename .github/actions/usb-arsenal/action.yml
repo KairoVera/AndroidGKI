@@ -130,7 +130,7 @@ runs:
         fi
 
     - name: Enable USB Arsenal kernel configs
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           # USB gadget functions (kernel-patches/README.md fragment)
@@ -145,7 +145,7 @@ runs:
     - name: Enable RNDIS on 5.10 only
       # Upstream: RNDIS left GKI after 5.10, where `tether` uses NCM instead.
       if: inputs.kernel_version == '5.10'
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_USB_CONFIGFS_RNDIS=y

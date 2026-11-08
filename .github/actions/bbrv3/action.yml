@@ -81,7 +81,7 @@ runs:
         echo "[+] BBRv3 patches applied"
 
     - name: Enable BBRv3 Kernel Config
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_TCP_CONG_BBR3=y

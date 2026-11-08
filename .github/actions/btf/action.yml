@@ -184,13 +184,13 @@ runs:
         fi
 
     - name: Enable BTF Config
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           CONFIG_DEBUG_INFO_BTF=y
 
     - name: Enable eBPF Kernel Configs
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           # eBPF support (Issue #176) - tiny safe programs that run in the kernel
@@ -201,7 +201,7 @@ runs:
           CONFIG_UPROBE_EVENTS=y
 
     - name: Enable FUSE-BPF Kernel Config
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/add-configs
       with:
         config_list: |
           # FUSE-BPF support (Issue #211) - FUSE filesystems backed by eBPF
