@@ -246,11 +246,13 @@ jobs:
           # 14-6.1) fs patches reference `fake_state` and will fail to link with
           # latest BakaSU; 6.6/6.12/6.18 are unaffected. Watch those 5 families.
           PIN_BAKASU="516d3e87fbc986ccefdde2c2765f1700612441a9"
-          # SukiSU-Ultra: builtin tip (1cfa5734, 2026-10-31); defines fake_state
-          # itself and calls the susfs_def.h no_su API -> OK on tips. Note the
-          # repo's default branch (main, b8bd4b6c) is used only for SUSFS-off
+          # SukiSU-Ultra: builtin tip (de9bc7e6, 2026-11-10, "Add the missing
+          # KSU_SUSFS_PRIORITY_UID_FILTER configuration option Close #1045").
+          # This adds the upstream-guarded config symbol so SUSFS-off builds no
+          # longer hit undefined-reference failures in pkg_observer / dispatch.
+          # Note the repo's default branch (main) is used only for SUSFS-off
           # builds, which resolve it at run time rather than from this pin.
-          PIN_SUKISU_ULTRA="1cfa57340590971cba7521ed536da8ebbedc5f0a"
+          PIN_SUKISU_ULTRA="de9bc7e6b46181f8b27ac7b96db946420838dd18"
           # FinaSU: susfs-integrated fork of the tiann restructure; pin tracks
           # the susfs4ksu v2.3 ABI era its supercall dispatch is written against.
           # master tip 2d5786b9 (2026-11-01, "susfs: Separate provider and
