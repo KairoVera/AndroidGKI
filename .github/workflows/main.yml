@@ -246,13 +246,12 @@ jobs:
           # 14-6.1) fs patches reference `fake_state` and will fail to link with
           # latest BakaSU; 6.6/6.12/6.18 are unaffected. Watch those 5 families.
           PIN_BAKASU="516d3e87fbc986ccefdde2c2765f1700612441a9"
-          # SukiSU-Ultra: builtin tip (de9bc7e6, 2026-11-10, "Add the missing
-          # KSU_SUSFS_PRIORITY_UID_FILTER configuration option Close #1045").
-          # This adds the upstream-guarded config symbol so SUSFS-off builds no
-          # longer hit undefined-reference failures in pkg_observer / dispatch.
-          # Note the repo's default branch (main) is used only for SUSFS-off
-          # builds, which resolve it at run time rather than from this pin.
-          PIN_SUKISU_ULTRA="de9bc7e6b46181f8b27ac7b96db946420838dd18"
+          # SukiSU-Ultra: builtin tip (6076949f, 2026-11-12, "selinux: fix
+          # reset_avc_cache() on < 5.10 kernels #1049"). Force-push rewrote the
+          # previous tip de9bc7e6; the new chain adds susfs_set_batch_sid() call
+          # in out_flush unconditionally and switches reset_avc_cache to take a
+          # seqno param on newer kernels. Our SUSFS stub patches remain compatible.
+          PIN_SUKISU_ULTRA="6076949f26bf51325bd5e4e790b699c6f2a6acb5"
           # FinaSU: susfs-integrated fork of the tiann restructure; pin tracks
           # the susfs4ksu v2.3 ABI era its supercall dispatch is written against.
           # master tip 2d5786b9 (2026-11-01, "susfs: Separate provider and
