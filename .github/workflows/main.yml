@@ -251,7 +251,7 @@ jobs:
           # previous tip de9bc7e6; the new chain adds susfs_set_batch_sid() call
           # in out_flush unconditionally and switches reset_avc_cache to take a
           # seqno param on newer kernels. Our SUSFS stub patches remain compatible.
-          PIN_SUKISU_ULTRA="6076949f26bf51325bd5e4e790b699c6f2a6acb5"
+          PIN_SUKISU_ULTRA="d2a3e56a4f963bd5ca2ad49371055fab5d3d6059"
           # FinaSU: susfs-integrated fork of the tiann restructure; pin tracks
           # the susfs4ksu v2.3 ABI era its supercall dispatch is written against.
           # master tip 2d5786b9 (2026-11-01, "susfs: Separate provider and
